@@ -1,0 +1,237 @@
+:root {
+  --bg: #f6f7fb;
+  --panel-bg: #ffffff;
+  --text: #1a1a2e;
+  --muted: #656d84;
+  --border: #e2e4ec;
+  --accent: #fe2c55;
+  --accent-dark: #d81f45;
+  --accent-2: #25f4ee;
+  --code-bg: #f1f2f7;
+  --danger: #d64545;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f0f16;
+    --panel-bg: #181822;
+    --text: #f2f2f7;
+    --muted: #9a9db0;
+    --border: #2a2b3a;
+    --code-bg: #10101a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.app-header {
+  padding: 2.5rem 1.5rem 1.5rem;
+  text-align: center;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+
+.app-header h1 {
+  margin: 0 0 0.5rem;
+  color: #fff;
+  font-size: 1.6rem;
+}
+
+.subtitle {
+  margin: 0;
+  color: #fff;
+  opacity: 0.9;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.notice {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.notice a {
+  color: var(--accent);
+}
+
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.panel h2 {
+  margin-top: 0;
+  font-size: 1.15rem;
+}
+
+.field {
+  margin-bottom: 1.1rem;
+}
+
+label {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+input[type="text"],
+input[type="password"] {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--code-bg);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.key-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.key-input input {
+  flex: 1 1 220px;
+}
+
+.hint {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin: 0.4rem 0 0;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  padding: 0.65rem 1.4rem;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background: var(--accent-dark);
+}
+
+.btn-secondary {
+  background: var(--code-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 0.55rem 0.9rem;
+}
+
+.btn-secondary:hover {
+  border-color: var(--accent);
+}
+
+.btn-icon {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.65rem;
+}
+
+.btn-copy {
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.btn-copy:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.profile-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.profile-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.15rem;
+}
+
+.profile-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-name {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.profile-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  min-width: 82px;
+}
+
+code {
+  background: var(--code-bg);
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  word-break: break-all;
+  flex: 1 1 auto;
+}
+
+.profile-footer {
+  margin-top: 0.75rem;
+  display: flex;
+  justify-content: flex-end;
+}
