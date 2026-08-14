@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TikTok Live Stream Key Manager</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>TikTok Live &mdash; Generador y Gestor de Stream Key</h1>
+    <p class="subtitle">
+      Organiza tus claves de transmisión, genera configuraciones listas para OBS
+      y crea claves de prueba para testing local.
+    </p>
+  </header>
+
+  <main>
+    <section class="notice">
+      <strong>Importante:</strong> TikTok es quien emite tu Server URL y Stream Key
+      reales, desde
+      <a href="https://livecenter.tiktok.com" target="_blank" rel="noopener noreferrer">TikTok Live Center</a>
+      (Configuración &rarr; Iniciar transmisión con software de terceros).
+      Esta app no puede generar una clave válida para transmitir en TikTok:
+      su función es ayudarte a organizar tus perfiles de transmisión, generar
+      el archivo de configuración para OBS y crear claves ficticias para probar
+      tu flujo de trabajo antes de salir en vivo.
+    </section>
+
+    <section class="panel">
+      <h2>Nuevo perfil de transmisión</h2>
+      <form id="profile-form">
+        <div class="field">
+          <label for="profile-name">Nombre del perfil</label>
+          <input id="profile-name" type="text" placeholder="Ej. Canal principal" required />
+        </div>
+
+        <div class="field">
+          <label for="server-url">Server URL (RTMP)</label>
+          <input id="server-url" type="text" placeholder="rtmp://push-rtmp.tiktokcdn.com/live/" value="rtmp://push-rtmp.tiktokcdn.com/live/" required />
+        </div>
+
+        <div class="field">
+          <label for="stream-key">Stream Key</label>
+          <div class="key-input">
+            <input id="stream-key" type="password" placeholder="Pega aquí tu clave de TikTok Live Center" />
+            <button type="button" id="toggle-key" class="btn-icon" title="Mostrar/ocultar">👁</button>
+            <button type="button" id="generate-test-key" class="btn-secondary" title="Generar clave de prueba (no válida en TikTok)">Generar clave de prueba</button>
+          </div>
+          <p class="hint">Las claves generadas aquí llevan el prefijo <code>TEST-</code> y solo sirven para probar tu configuración local, nunca para transmitir en TikTok.</p>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn-primary">Guardar perfil</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Perfiles guardados</h2>
+      <p id="empty-state" class="hint">Aún no tienes perfiles guardados.</p>
+      <ul id="profile-list" class="profile-list"></ul>
+    </section>
+  </main>
+
+  <template id="profile-template">
+    <li class="profile-card">
+      <div class="profile-card-header">
+        <h3 class="profile-name"></h3>
+        <button type="button" class="btn-icon delete-btn" title="Eliminar perfil">🗑</button>
+      </div>
+
+      <div class="profile-row">
+        <span class="profile-label">Server URL</span>
+        <code class="profile-server"></code>
+        <button type="button" class="btn-copy" data-copy="server">Copiar</button>
+      </div>
+
+      <div class="profile-row">
+        <span class="profile-label">Stream Key</span>
+        <code class="profile-key masked"></code>
+        <button type="button" class="btn-icon reveal-btn" title="Mostrar/ocultar">👁</button>
+        <button type="button" class="btn-copy" data-copy="key">Copiar</button>
+      </div>
+
+      <div class="profile-footer">
+        <button type="button" class="btn-secondary download-btn">Descargar config OBS (.txt)</button>
+      </div>
+    </li>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
