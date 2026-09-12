@@ -5,6 +5,7 @@ const ICONS = {
   dashboard: '📊',
   products: '📦',
   history: '🧾',
+  reports: '📈',
   settings: '⚙️',
 };
 

@@ -15,6 +15,16 @@ pensado para correr en la computadora de la tienda y solo se accede con un PIN.
   (uso/venta) y ajustes manuales; el stock del producto se actualiza solo.
 - **Historial**: bitácora completa de todos los movimientos con fecha, tipo,
   cantidad y nota.
+- **Reportes mensuales**: por cada mes muestra las ganancias (calculadas con
+  el precio/costo vigente al momento de cada venta), el gasto en reposición,
+  qué productos hay que reponer y las alertas críticas de inventario.
+- **Control de caja**: registra aparte cuánto dinero realmente ingresó y
+  cuánto falta, para contrastarlo contra las ventas que calcula el sistema y
+  detectar diferencias.
+- **Análisis con IA**: un botón en Reportes genera (con la API de Claude) un
+  resumen en español del mes — ganancias, qué reponer con urgencia, alertas
+  críticas y si el efectivo registrado coincide con las ventas — y lo guarda
+  para no tener que regenerarlo cada vez que abres la página.
 - **Acceso con PIN**: pantalla de bloqueo antes de entrar al panel, con
   posibilidad de cambiar el PIN desde Ajustes.
 - Interfaz visual con animaciones (React + Tailwind + Framer Motion).
@@ -44,6 +54,17 @@ npm start               # o "npm run dev" para reinicio automático
 
 La API queda escuchando en `http://localhost:4000`. La base de datos SQLite se
 crea automáticamente en `server/data/tienda.db` la primera vez que arranca.
+
+Para habilitar el botón **"Generar análisis"** de la sección Reportes, agrega
+tu API key de Anthropic en `server/.env`:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Consíguela en <https://console.anthropic.com/>. Si la dejas vacía, el resto
+del panel (productos, movimientos, reportes, caja) funciona igual; solo el
+botón de análisis con IA mostrará un aviso pidiendo configurarla.
 
 ### 2. Frontend (panel)
 

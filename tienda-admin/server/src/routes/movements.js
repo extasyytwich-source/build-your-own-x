@@ -70,10 +70,10 @@ const registerMovement = db.transaction((productId, type, quantity, note) => {
 
   const result = db
     .prepare(
-      `INSERT INTO movements (product_id, type, quantity, stock_after, note)
-       VALUES (?, ?, ?, ?, ?)`
+      `INSERT INTO movements (product_id, type, quantity, stock_after, note, unit_price, unit_cost)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(productId, type, quantity, newStock, note || null);
+    .run(productId, type, quantity, newStock, note || null, product.price, product.cost);
 
   return db.prepare(MOVEMENTS_QUERY + ' WHERE movements.id = ?').get(result.lastInsertRowid);
 });

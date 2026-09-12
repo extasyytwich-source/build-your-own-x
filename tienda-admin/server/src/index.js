@@ -6,6 +6,8 @@ import { authRouter } from './routes/auth.js';
 import { productsRouter } from './routes/products.js';
 import { movementsRouter } from './routes/movements.js';
 import { statsRouter } from './routes/stats.js';
+import { cashRouter } from './routes/cash.js';
+import { reportsRouter } from './routes/reports.js';
 
 const PORT = process.env.PORT || 4000;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
@@ -22,6 +24,8 @@ app.use('/api/auth', authRouter);
 app.use('/api/products', requireAuth, productsRouter);
 app.use('/api/movements', requireAuth, movementsRouter);
 app.use('/api/stats', requireAuth, statsRouter);
+app.use('/api/cash', requireAuth, cashRouter);
+app.use('/api/reports', requireAuth, reportsRouter);
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {

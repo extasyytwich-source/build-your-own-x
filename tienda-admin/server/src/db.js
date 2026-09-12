@@ -48,9 +48,37 @@ db.exec(`
     value TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS cash_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_date TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('ingreso', 'faltante')),
+    amount REAL NOT NULL,
+    note TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS monthly_analyses (
+    month TEXT PRIMARY KEY,
+    analysis TEXT NOT NULL,
+    generated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_movements_product ON movements(product_id);
   CREATE INDEX IF NOT EXISTS idx_movements_created ON movements(created_at);
+  CREATE INDEX IF NOT EXISTS idx_cash_entries_date ON cash_entries(entry_date);
 `);
+
+function ensureColumn(table, column, definition) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!columns.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+// Guarda el precio/costo vigentes al momento del movimiento, para que los
+// reportes mensuales reflejen las ganancias reales aunque el precio cambie después.
+ensureColumn('movements', 'unit_price', 'REAL NOT NULL DEFAULT 0');
+ensureColumn('movements', 'unit_cost', 'REAL NOT NULL DEFAULT 0');
 
 export function getSetting(key) {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);

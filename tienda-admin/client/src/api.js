@@ -59,4 +59,13 @@ export const api = {
   createMovement: (data) => request('/movements', { method: 'POST', body: data }),
 
   getStats: () => request('/stats'),
+
+  getMonthlyReport: (month) => request(`/reports/monthly?month=${month}`),
+  getMonthlyAnalysis: (month) => request(`/reports/monthly/analysis?month=${month}`),
+  generateMonthlyAnalysis: (month) =>
+    request('/reports/monthly/analysis', { method: 'POST', body: { month } }),
+
+  getCashEntries: (month) => request(`/cash?month=${month}`),
+  createCashEntry: (data) => request('/cash', { method: 'POST', body: data }),
+  deleteCashEntry: (id) => request(`/cash/${id}`, { method: 'DELETE' }),
 };

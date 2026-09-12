@@ -6,12 +6,14 @@ import Sidebar from './components/Sidebar.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import ProductList from './components/ProductList.jsx';
 import MovementHistory from './components/MovementHistory.jsx';
+import Reports from './components/Reports.jsx';
 import Settings from './components/Settings.jsx';
 
 const VIEWS = {
   dashboard: { label: 'Panel', component: Dashboard },
   products: { label: 'Productos', component: ProductList },
   history: { label: 'Historial', component: MovementHistory },
+  reports: { label: 'Reportes', component: Reports },
   settings: { label: 'Ajustes', component: Settings },
 };
 
