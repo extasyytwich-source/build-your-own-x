@@ -1,0 +1,134 @@
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { api } from '../api.js';
+import { useAuth } from '../context/AuthContext.jsx';
+import { useToast } from '../context/ToastContext.jsx';
+import StatCard from './StatCard.jsx';
+
+const currency = (n) =>
+  Number(n || 0).toLocaleString('es', { style: 'currency', currency: 'USD' });
+
+export default function Dashboard() {
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const { handleUnauthorized } = useAuth();
+  const { notify } = useToast();
+
+  useEffect(() => {
+    let active = true;
+    api
+      .getStats()
+      .then((data) => active && setStats(data))
+      .catch((err) => {
+        if (err.status === 401) return handleUnauthorized();
+        notify(err.message, 'error');
+      })
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (loading) {
+    return <div className="py-16 text-center text-slate-400">Cargando panel…</div>;
+  }
+
+  if (!stats) return null;
+
+  return (
+    <div>
+      <h1 className="mb-1 text-2xl font-semibold text-slate-800">Panel general</h1>
+      <p className="mb-6 text-sm text-slate-500">
+        Resumen del inventario y la actividad de la tienda.
+      </p>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          icon="📦"
+          label="Productos activos"
+          value={stats.totalProducts}
+          accent="brand"
+          delay={0}
+        />
+        <StatCard
+          icon="💰"
+          label="Valor del inventario (costo)"
+          value={stats.totalStockValue}
+          formatter={currency}
+          accent="emerald"
+          delay={0.05}
+        />
+        <StatCard
+          icon="⚠️"
+          label="Productos con stock bajo"
+          value={stats.lowStockCount}
+          accent="amber"
+          delay={0.1}
+        />
+        <StatCard
+          icon="🔁"
+          label="Movimientos hoy"
+          value={stats.movementsToday}
+          accent="rose"
+          delay={0.15}
+        />
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="card p-5"
+        >
+          <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
+            ⚠️ Stock bajo mínimo
+          </h2>
+          {stats.lowStockProducts.length === 0 ? (
+            <p className="text-sm text-slate-400">
+              Todo en orden, ningún producto está por debajo de su mínimo.
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {stats.lowStockProducts.map((p) => (
+                <li key={p.id} className="flex items-center justify-between py-2.5 text-sm">
+                  <span className="font-medium text-slate-700">{p.name}</span>
+                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                    {p.stock} / {p.minStock} {p.unit}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="card p-5"
+        >
+          <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
+            🔥 Más usados / vendidos
+          </h2>
+          {stats.topUsedProducts.length === 0 ? (
+            <p className="text-sm text-slate-400">
+              Aún no hay salidas registradas para mostrar un ranking.
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {stats.topUsedProducts.map((p) => (
+                <li key={p.id} className="flex items-center justify-between py-2.5 text-sm">
+                  <span className="font-medium text-slate-700">{p.name}</span>
+                  <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
+                    {p.totalSalida} usados
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </motion.div>
+      </div>
+    </div>
+  );
+}
