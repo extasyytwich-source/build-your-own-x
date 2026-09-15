@@ -84,11 +84,15 @@ export async function activateSubscription(businessId, subscriptionId) {
 
 export async function requireActiveSubscription(req, res, next) {
   const { rows } = await pool.query(
-    'SELECT subscription_status, subscription_vence FROM businesses WHERE id = $1',
+    'SELECT subscription_status, subscription_vence, subscription_exempt FROM businesses WHERE id = $1',
     [req.businessId]
   );
   const business = rows[0];
   if (!business) return res.status(404).json({ error: 'Negocio no encontrado' });
+
+  // Cuentas marcadas manualmente como exentas (ej. la del dueño de Mostrador
+  // para probar/demostrar el panel) nunca quedan bloqueadas por pago.
+  if (business.subscription_exempt) return next();
 
   const now = new Date();
   const vence = business.subscription_vence ? new Date(business.subscription_vence) : null;
