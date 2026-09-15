@@ -1,0 +1,37 @@
+name: Publicar release del Panel de la Tienda (escritorio)
+
+# Se dispara solo con un tag dedicado (no con cada push a tienda-admin/**,
+# eso ya lo cubre el workflow de build normal) para no mezclar los
+# instaladores de este programa con el resto del contenido del repositorio.
+# Para publicar una actualización: sube la versión en desktop/package.json,
+# haz commit, y crea/empuja un tag como `tienda-admin-v1.1.0`. Los programas
+# ya instalados la detectan solos (ver desktop/main.cjs, setupAutoUpdater).
+on:
+  push:
+    tags:
+      - 'tienda-admin-v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Compilar y publicar el instalador como GitHub Release
+        working-directory: tienda-admin/desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm install
+          npm run release

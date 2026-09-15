@@ -27,6 +27,17 @@ pensado para correr en la computadora de la tienda y solo se accede con un PIN.
   para no tener que regenerarlo cada vez que abres la página.
 - **Acceso con PIN**: pantalla de bloqueo antes de entrar al panel, con
   posibilidad de cambiar el PIN desde Ajustes.
+- **Lector de código de barras**: en Productos, escanear el código de un
+  producto (usando su SKU) abre directo el modal de "Registrar movimiento" —
+  no hace falta buscarlo a mano. Funciona con cualquier lector USB/Bluetooth
+  común, que se comporta como un teclado.
+- **Respaldo y exportación** (en Ajustes): descarga una copia completa de la
+  base de datos, restaura un respaldo anterior, o exporta productos,
+  movimientos y caja a CSV para revisarlos en Excel. La app de escritorio
+  además guarda respaldos automáticos cada 6 horas (conserva los últimos 14).
+- **Actualizaciones automáticas** (app de escritorio): revisa sola si hay una
+  versión nueva publicada y ofrece instalarla, sin que el dueño tenga que
+  descargar nada manualmente.
 - **App de escritorio**: se puede empaquetar como programa instalable de
   Windows/Mac/Linux (doble clic para abrir, sin terminal ni Node.js instalado).
 - Interfaz visual con animaciones (React + Tailwind + Framer Motion).
@@ -137,6 +148,28 @@ Al abrir el programa por primera vez, el PIN por defecto es `1234` — pídele
 que lo cambie de inmediato desde **Ajustes**. Si quiere el análisis con IA,
 también puede pegar ahí su propia API key de Anthropic (no requiere editar
 ningún archivo).
+
+### Publicar una actualización (para que las apps ya instaladas se actualicen solas)
+
+La app de escritorio revisa sola si hay una versión nueva (ver
+`desktop/main.cjs`, `setupAutoUpdater`). Para publicar una:
+
+1. Sube el número de versión en `tienda-admin/desktop/package.json`.
+2. Haz commit de ese cambio.
+3. Crea y empuja un tag con el formato `tienda-admin-vX.Y.Z`, por ejemplo:
+
+   ```bash
+   git tag tienda-admin-v1.1.0
+   git push origin tienda-admin-v1.1.0
+   ```
+
+4. El workflow `.github/workflows/tienda-admin-desktop-release.yml` compila
+   los instaladores de Windows/Mac/Linux y los publica como GitHub Release.
+   Los programas ya instalados la detectan sola (revisan cada 6 horas y al
+   abrir) y ofrecen instalarla.
+
+Ese tag solo dispara este workflow — no interfiere con el resto del
+contenido del repositorio ni con el workflow de compilación normal.
 
 ## Seguridad
 

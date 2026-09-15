@@ -17,13 +17,15 @@
     "dist": "npm run build:client && electron-builder --publish never",
     "dist:win": "npm run build:client && electron-builder --win --publish never",
     "dist:mac": "npm run build:client && electron-builder --mac --publish never",
-    "dist:linux": "npm run build:client && electron-builder --linux --publish never"
+    "dist:linux": "npm run build:client && electron-builder --linux --publish never",
+    "release": "npm run build:client && electron-builder --publish always"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
     "better-sqlite3": "^11.3.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "electron-updater": "^6.3.9",
     "express": "^4.21.0"
   },
   "devDependencies": {
@@ -34,6 +36,11 @@
     "appId": "com.tiendaadmin.panellatienda",
     "productName": "Panel de la Tienda",
     "asar": false,
+    "publish": {
+      "provider": "github",
+      "owner": "extasyytwich-source",
+      "repo": "build-your-own-x"
+    },
     "directories": {
       "buildResources": "build",
       "output": "release"

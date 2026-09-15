@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db.js';
+import { toCsv, sendCsv } from '../csv.js';
 
 export const movementsRouter = Router();
 
@@ -42,6 +43,23 @@ movementsRouter.get('/', (req, res) => {
 
   const rows = db.prepare(query).all(...params);
   res.json(rows.map(serializeMovement));
+});
+
+movementsRouter.get('/export.csv', (req, res) => {
+  const rows = db
+    .prepare(MOVEMENTS_QUERY + ' ORDER BY movements.created_at DESC, movements.id DESC')
+    .all();
+  const csv = toCsv(rows, [
+    { label: 'Fecha', value: (r) => r.created_at },
+    { label: 'Producto', value: (r) => r.product_name },
+    { label: 'Tipo', value: (r) => r.type },
+    { label: 'Cantidad', value: (r) => r.quantity },
+    { label: 'Stock resultante', value: (r) => r.stock_after },
+    { label: 'Precio unitario', value: (r) => r.unit_price },
+    { label: 'Costo unitario', value: (r) => r.unit_cost },
+    { label: 'Nota', value: (r) => r.note },
+  ]);
+  sendCsv(res, 'movimientos.csv', csv);
 });
 
 const registerMovement = db.transaction((productId, type, quantity, note) => {

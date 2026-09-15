@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db.js';
+import { toCsv, sendCsv } from '../csv.js';
 
 export const productsRouter = Router();
 
@@ -48,6 +49,33 @@ productsRouter.get('/categories', (req, res) => {
     .prepare('SELECT DISTINCT category FROM products ORDER BY category ASC')
     .all();
   res.json(rows.map((r) => r.category));
+});
+
+// Búsqueda exacta por SKU: la usa el lector de código de barras, que escanea
+// el código completo de una vez (a diferencia de la búsqueda por texto, que
+// es parcial con LIKE).
+productsRouter.get('/lookup', (req, res) => {
+  const code = String(req.query.code || '').trim();
+  if (!code) return res.status(400).json({ error: 'Falta el código' });
+  const row = db.prepare('SELECT * FROM products WHERE sku = ? COLLATE NOCASE').get(code);
+  if (!row) return res.status(404).json({ error: 'Ningún producto tiene ese código' });
+  res.json(serializeProduct(row));
+});
+
+productsRouter.get('/export.csv', (req, res) => {
+  const rows = db.prepare('SELECT * FROM products ORDER BY name ASC').all();
+  const csv = toCsv(rows, [
+    { label: 'Nombre', value: (r) => r.name },
+    { label: 'SKU', value: (r) => r.sku },
+    { label: 'Categoría', value: (r) => r.category },
+    { label: 'Precio', value: (r) => r.price },
+    { label: 'Costo', value: (r) => r.cost },
+    { label: 'Stock', value: (r) => r.stock },
+    { label: 'Stock mínimo', value: (r) => r.min_stock },
+    { label: 'Unidad', value: (r) => r.unit },
+    { label: 'Descripción', value: (r) => r.description },
+  ]);
+  sendCsv(res, 'productos.csv', csv);
 });
 
 productsRouter.get('/:id', (req, res) => {

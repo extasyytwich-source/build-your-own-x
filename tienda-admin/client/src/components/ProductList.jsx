@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner.js';
 import ProductFormModal from './ProductFormModal.jsx';
 import MovementModal from './MovementModal.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import EmptyState from './EmptyState.jsx';
-import { IconAlertTriangle, IconBox } from './icons.jsx';
+import { IconAlertTriangle, IconBox, IconBarcode } from './icons.jsx';
 
 const currency = (n) =>
   Number(n || 0).toLocaleString('es', { style: 'currency', currency: 'USD' });
@@ -85,6 +86,23 @@ export default function ProductList() {
     }
   }
 
+  const scannerEnabled = !formOpen && !movementProduct && !deleteTarget;
+  const handleScan = useCallback(
+    async (code) => {
+      try {
+        const product = await api.lookupProductByCode(code);
+        setMovementProduct(product);
+        notify(`Escaneado: ${product.name}`);
+      } catch (err) {
+        if (err.status === 401) return handleUnauthorized();
+        notify(`Código no encontrado: ${code}`, 'error');
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+  useBarcodeScanner(handleScan, { enabled: scannerEnabled });
+
   const emptyState = useMemo(
     () => !loading && products.length === 0,
     [loading, products]
@@ -105,7 +123,7 @@ export default function ProductList() {
         </button>
       </div>
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <input
           className="input sm:max-w-xs"
           placeholder="Buscar por nombre o SKU…"
@@ -124,6 +142,22 @@ export default function ProductList() {
             </option>
           ))}
         </select>
+        {scannerEnabled && (
+          <motion.span
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500"
+            title="Escanea un código de barras para registrar un movimiento al instante"
+          >
+            <motion.span
+              animate={{ opacity: [1, 0.35, 1] }}
+              transition={{ duration: 1.8, repeat: Infinity }}
+            >
+              <IconBarcode className="h-3.5 w-3.5" />
+            </motion.span>
+            Lector de código de barras activo
+          </motion.span>
+        )}
       </div>
 
       <div className="card overflow-hidden">

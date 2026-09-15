@@ -15,6 +15,20 @@ if (!fs.existsSync(dataDir)) {
 }
 
 const dbPath = path.join(dataDir, 'tienda.db');
+const pendingRestorePath = `${dbPath}.pending-restore`;
+
+// El restore de un respaldo no reemplaza el archivo mientras el programa está
+// corriendo (la conexión ya abierta seguiría apuntando al archivo viejo): en
+// vez de eso, /api/settings/restore deja el archivo subido aquí, y este
+// bloque lo aplica en el siguiente arranque, antes de abrir la base real.
+if (fs.existsSync(pendingRestorePath)) {
+  for (const suffix of ['-wal', '-shm']) {
+    const sidecar = dbPath + suffix;
+    if (fs.existsSync(sidecar)) fs.rmSync(sidecar);
+  }
+  fs.renameSync(pendingRestorePath, dbPath);
+}
+
 export const db = new Database(dbPath);
 
 db.pragma('journal_mode = WAL');
@@ -94,3 +108,5 @@ export function setSetting(key, value) {
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
   ).run(key, value);
 }
+
+export { dbPath, dataDir, pendingRestorePath };

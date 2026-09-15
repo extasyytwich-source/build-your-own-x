@@ -167,3 +167,47 @@ export function IconCheck(props) {
     </svg>
   );
 }
+
+export function IconDownload(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M12 3v13m0 0-4.5-4.5M12 16l4.5-4.5" />
+      <path d="M4 19.5h16" />
+    </svg>
+  );
+}
+
+export function IconUpload(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M12 20V7m0 0-4.5 4.5M12 7l4.5 4.5" />
+      <path d="M4 19.5h16" />
+    </svg>
+  );
+}
+
+export function IconFileText(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M7 3h7l4 4v14H7Z" />
+      <path d="M14 3v4h4M9.5 13h5M9.5 16.5h5" />
+    </svg>
+  );
+}
+
+export function IconBarcode(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M4 5v14M8 5v14M11 5v14M15 5v14M17.5 5v14M20 5v14" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+export function IconRefreshCw(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M3.5 12a8.5 8.5 0 0 1 14.6-5.9L20.5 8.5M20.5 5v3.5H17" />
+      <path d="M20.5 12a8.5 8.5 0 0 1-14.6 5.9L3.5 15.5M3.5 19v-3.5H7" />
+    </svg>
+  );
+}

@@ -77,4 +77,54 @@ export const api = {
   getAiSettings: () => request('/settings/ai'),
   saveAiApiKey: (apiKey) => request('/settings/ai', { method: 'POST', body: { apiKey } }),
   deleteAiApiKey: () => request('/settings/ai', { method: 'DELETE' }),
+
+  lookupProductByCode: (code) => request(`/products/lookup?code=${encodeURIComponent(code)}`),
+
+  downloadBackup: () => downloadFile('/settings/backup', `tienda-respaldo-${todayStamp()}.db`),
+  exportProductsCsv: () => downloadFile('/products/export.csv', 'productos.csv'),
+  exportMovementsCsv: () => downloadFile('/movements/export.csv', 'movimientos.csv'),
+  exportCashCsv: () => downloadFile('/cash/export.csv', 'caja.csv'),
+  restoreBackup: async (file) => {
+    const token = getToken();
+    const res = await fetch('/api/settings/restore', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: file,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.error || 'No se pudo restaurar el respaldo');
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  },
+  restartApp: () => request('/settings/restart-app', { method: 'POST' }),
 };
+
+function todayStamp() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function downloadFile(path, filename) {
+  const token = getToken();
+  const res = await fetch(`/api${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'No se pudo descargar el archivo');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

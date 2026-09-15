@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { monthRange } from '../dates.js';
+import { toCsv, sendCsv } from '../csv.js';
 
 export const cashRouter = Router();
 
@@ -33,6 +34,17 @@ cashRouter.get('/', (req, res) => {
 
   const rows = db.prepare(query).all(...params);
   res.json(rows.map(serializeCashEntry));
+});
+
+cashRouter.get('/export.csv', (req, res) => {
+  const rows = db.prepare('SELECT * FROM cash_entries ORDER BY entry_date DESC, id DESC').all();
+  const csv = toCsv(rows, [
+    { label: 'Fecha', value: (r) => r.entry_date },
+    { label: 'Tipo', value: (r) => (r.type === 'ingreso' ? 'Ingreso' : 'Faltante') },
+    { label: 'Monto', value: (r) => r.amount },
+    { label: 'Nota', value: (r) => r.note },
+  ]);
+  sendCsv(res, 'caja.csv', csv);
 });
 
 cashRouter.post('/', (req, res) => {
