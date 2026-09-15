@@ -68,4 +68,8 @@ export const api = {
   getCashEntries: (month) => request(`/cash?month=${month}`),
   createCashEntry: (data) => request('/cash', { method: 'POST', body: data }),
   deleteCashEntry: (id) => request(`/cash/${id}`, { method: 'DELETE' }),
+
+  getAiSettings: () => request('/settings/ai'),
+  saveAiApiKey: (apiKey) => request('/settings/ai', { method: 'POST', body: { apiKey } }),
+  deleteAiApiKey: () => request('/settings/ai', { method: 'DELETE' }),
 };

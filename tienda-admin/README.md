@@ -27,6 +27,8 @@ pensado para correr en la computadora de la tienda y solo se accede con un PIN.
   para no tener que regenerarlo cada vez que abres la página.
 - **Acceso con PIN**: pantalla de bloqueo antes de entrar al panel, con
   posibilidad de cambiar el PIN desde Ajustes.
+- **App de escritorio**: se puede empaquetar como programa instalable de
+  Windows/Mac/Linux (doble clic para abrir, sin terminal ni Node.js instalado).
 - Interfaz visual con animaciones (React + Tailwind + Framer Motion).
 
 ## Estructura del proyecto
@@ -35,6 +37,7 @@ pensado para correr en la computadora de la tienda y solo se accede con un PIN.
 tienda-admin/
   server/   API en Node.js + Express + SQLite (better-sqlite3)
   client/   Interfaz en React + Vite + Tailwind + Framer Motion
+  desktop/  Empaquetado como programa de escritorio (Electron)
 ```
 
 ## Requisitos
@@ -91,6 +94,49 @@ cd ../server && npm start                 # deja la API corriendo
 Sirve los archivos de `client/dist` con cualquier servidor estático (o ábrelos
 detrás de la misma API) y dale al dueño de la tienda solo el acceso a esa
 máquina o red local — el panel no debe exponerse a internet público.
+
+## Entregarlo como programa de escritorio (recomendado)
+
+Esta es la forma más simple de dárselo al dueño de la tienda: un instalador
+que abre con doble clic, sin instalar Node.js ni usar la terminal. Por dentro
+sigue siendo el mismo backend (Express + SQLite) corriendo dentro de la app
+de Electron, con su base de datos guardada en la carpeta de datos del sistema
+operativo (sobrevive si reinstalas o actualizas el programa).
+
+### Opción A: generar el instalador con GitHub Actions (no necesitas Windows ni Mac)
+
+El repositorio incluye el workflow `.github/workflows/tienda-admin-desktop-build.yml`,
+que compila el instalador para Windows, Mac y Linux en máquinas de GitHub:
+
+1. En GitHub, ve a la pestaña **Actions** del repositorio.
+2. Abre **"Empaquetar Panel de la Tienda (escritorio)"** y presiona **Run workflow**
+   (o simplemente haz push a la rama — el workflow también corre solo cuando
+   cambia algo dentro de `tienda-admin/`).
+3. Cuando termine (unos minutos), entra a esa ejecución y descarga el artefacto
+   que necesites: `panel-tienda-windows-installer` (`.exe`), `panel-tienda-mac-installer`
+   (`.dmg`) o `panel-tienda-linux-installer` (`.AppImage`).
+4. Manda ese archivo al dueño de la tienda (USB, correo, Drive, WhatsApp…) y
+   que lo abra como cualquier instalador.
+
+### Opción B: generarlo tú mismo en tu computadora
+
+```bash
+cd tienda-admin/desktop
+npm install                # instala Electron y recompila better-sqlite3 para su motor
+npm run dist:win           # o dist:mac / dist:linux, según en qué SO lo corras
+```
+
+El instalador queda en `tienda-admin/desktop/release/`. Los instaladores de
+Windows y Mac solo se pueden generar corriendo el comando en esa misma
+plataforma (o usando la Opción A), por eso conviene el workflow de GitHub
+Actions si tú trabajas en otro sistema operativo.
+
+### Primer uso por el dueño de la tienda
+
+Al abrir el programa por primera vez, el PIN por defecto es `1234` — pídele
+que lo cambie de inmediato desde **Ajustes**. Si quiere el análisis con IA,
+también puede pegar ahí su propia API key de Anthropic (no requiere editar
+ningún archivo).
 
 ## Seguridad
 

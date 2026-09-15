@@ -1,0 +1,63 @@
+{
+  "name": "panel-tienda-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Programa de escritorio del Panel de la Tienda (Electron)",
+  "main": "main.cjs",
+  "type": "module",
+  "author": "Panel de la Tienda",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/extasyytwich-source/build-your-own-x.git"
+  },
+  "scripts": {
+    "build:client": "npm --prefix ../client install && npm --prefix ../client run build",
+    "start": "npm run build:client && electron .",
+    "postinstall": "electron-builder install-app-deps",
+    "dist": "npm run build:client && electron-builder --publish never",
+    "dist:win": "npm run build:client && electron-builder --win --publish never",
+    "dist:mac": "npm run build:client && electron-builder --mac --publish never",
+    "dist:linux": "npm run build:client && electron-builder --linux --publish never"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "better-sqlite3": "^11.3.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.5"
+  },
+  "build": {
+    "appId": "com.tiendaadmin.panellatienda",
+    "productName": "Panel de la Tienda",
+    "asar": false,
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "files": [
+      "main.cjs",
+      "package.json",
+      { "from": "../server/src", "to": "server/src" },
+      { "from": "../client/dist", "to": "client/dist" }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.business"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Office"
+    }
+  }
+}

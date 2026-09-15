@@ -4,7 +4,11 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = path.join(__dirname, '..', 'data');
+// En la app de escritorio (Electron), DATA_DIR apunta a la carpeta de datos
+// del usuario del sistema operativo, para que la base de datos sobreviva
+// actualizaciones del programa. Sin esa variable (modo servidor/dev), usa la
+// carpeta local del proyecto.
+const dataDir = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });

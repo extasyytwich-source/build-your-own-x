@@ -1,11 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { getSetting } from './db.js';
 
-let client = null;
+// La API key puede venir de .env (uso como servidor/dev) o haberse guardado
+// desde Ajustes en la base de datos (uso como app de escritorio, donde no hay
+// un .env que el dueño de la tienda pueda editar). La de la base de datos
+// gana si ambas están presentes, para que cambiarla desde la UI funcione de
+// inmediato sin reiniciar el programa.
+export function getEffectiveApiKey() {
+  return getSetting('anthropic_api_key') || process.env.ANTHROPIC_API_KEY || null;
+}
 
 function getClient() {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
-  if (!client) client = new Anthropic();
-  return client;
+  const apiKey = getEffectiveApiKey();
+  if (!apiKey) return null;
+  return new Anthropic({ apiKey });
 }
 
 const SYSTEM_PROMPT = `Eres un asesor de negocio para el dueño de una tienda pequeña.
@@ -29,7 +37,7 @@ export async function generateMonthlyAnalysis(stats, month) {
   const anthropic = getClient();
   if (!anthropic) {
     const err = new Error(
-      'Configura ANTHROPIC_API_KEY en server/.env para habilitar el análisis con IA'
+      'Configura tu API key de Anthropic en Ajustes para habilitar el análisis con IA'
     );
     err.status = 400;
     throw err;

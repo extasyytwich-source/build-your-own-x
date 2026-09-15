@@ -5,3 +5,6 @@ server/data/*.db
 server/data/*.db-shm
 server/data/*.db-wal
 *.log
+desktop/release/
+desktop/server/
+desktop/client/

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '../api.js';
 import { useToast } from '../context/ToastContext.jsx';
@@ -8,7 +8,16 @@ export default function Settings() {
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const [aiStatus, setAiStatus] = useState(null);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [savingKey, setSavingKey] = useState(false);
+
   const { notify } = useToast();
+
+  useEffect(() => {
+    api.getAiSettings().then(setAiStatus).catch(() => {});
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -27,6 +36,31 @@ export default function Settings() {
       notify(err.message, 'error');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveApiKey(e) {
+    e.preventDefault();
+    setSavingKey(true);
+    try {
+      await api.saveAiApiKey(apiKeyInput);
+      notify('API key guardada');
+      setApiKeyInput('');
+      setAiStatus(await api.getAiSettings());
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setSavingKey(false);
+    }
+  }
+
+  async function handleRemoveApiKey() {
+    try {
+      await api.deleteAiApiKey();
+      notify('API key eliminada');
+      setAiStatus(await api.getAiSettings());
+    } catch (err) {
+      notify(err.message, 'error');
     }
   }
 
@@ -79,6 +113,45 @@ export default function Settings() {
           {saving ? 'Guardando…' : 'Actualizar PIN'}
         </button>
       </motion.form>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="card mt-6 max-w-sm p-6"
+      >
+        <h2 className="mb-1 text-sm font-semibold text-slate-700">Análisis con IA</h2>
+        <p className="mb-4 text-xs text-slate-500">
+          Pega aquí tu API key de Anthropic para habilitar el botón "Generar análisis" en
+          Reportes. Se guarda en este programa, no se comparte con nadie más.
+        </p>
+
+        {aiStatus?.configured && (
+          <div className="mb-3 flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+            <span>
+              Configurada{aiStatus.source === 'env' ? ' (desde .env)' : ''}: {aiStatus.maskedKey}
+            </span>
+            {aiStatus.source !== 'env' && (
+              <button onClick={handleRemoveApiKey} className="font-medium underline">
+                Quitar
+              </button>
+            )}
+          </div>
+        )}
+
+        <form onSubmit={handleSaveApiKey} className="flex gap-2">
+          <input
+            type="password"
+            className="input"
+            placeholder="sk-ant-..."
+            value={apiKeyInput}
+            onChange={(e) => setApiKeyInput(e.target.value)}
+          />
+          <button type="submit" disabled={savingKey || !apiKeyInput} className="btn-secondary">
+            {savingKey ? 'Guardando…' : 'Guardar'}
+          </button>
+        </form>
+      </motion.div>
     </div>
   );
 }
