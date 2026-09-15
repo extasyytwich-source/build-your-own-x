@@ -169,6 +169,14 @@ export function IconCamera(props) {
   );
 }
 
+export function IconFlash(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" />
+    </svg>
+  );
+}
+
 export function IconBarcode(props) {
   return (
     <svg viewBox="0 0 24 24" {...base} {...props} strokeWidth={1.6}>
