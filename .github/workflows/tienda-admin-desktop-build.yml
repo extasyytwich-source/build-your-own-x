@@ -1,0 +1,45 @@
+name: Empaquetar Panel de la Tienda (escritorio)
+
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'tienda-admin/**'
+      - '.github/workflows/tienda-admin-desktop-build.yml'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact-name: windows-installer
+          - os: macos-latest
+            artifact-name: mac-installer
+          - os: ubuntu-latest
+            artifact-name: linux-installer
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias y compilar el instalador
+        working-directory: tienda-admin/desktop
+        run: |
+          npm install
+          npm run dist
+
+      - name: Subir el instalador generado
+        uses: actions/upload-artifact@v4
+        with:
+          name: panel-tienda-${{ matrix.artifact-name }}
+          path: |
+            tienda-admin/desktop/release/*.exe
+            tienda-admin/desktop/release/*.dmg
+            tienda-admin/desktop/release/*.AppImage
+            tienda-admin/desktop/release/*.blockmap
+          if-no-files-found: warn
