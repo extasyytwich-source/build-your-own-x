@@ -27,6 +27,14 @@ function hashPassword(password, salt) {
   return crypto.scryptSync(String(password), salt, 64).toString('hex');
 }
 
+// Una cuenta exenta (ver migraciones 0003/0004) siempre se reporta como
+// "activa", sin importar el estado real del pago — igual que hace
+// /api/billing/status, para que login/signup/Google no la manden a la
+// pantalla de Suscríbete apenas entra.
+function effectiveSubscriptionStatus(row) {
+  return row.subscription_exempt ? 'activa' : row.subscription_status;
+}
+
 // Crea el negocio y su primer usuario (el dueño) en una sola transacción.
 export async function createBusiness(businessName, email, password) {
   const normalizedEmail = email.toLowerCase().trim();
@@ -72,7 +80,7 @@ export async function createBusiness(businessName, email, password) {
 export async function verifyCredentials(email, password) {
   const { rows } = await pool.query(
     `SELECT users.id AS user_id, users.password_hash, users.password_salt, users.business_id,
-            businesses.subscription_status
+            businesses.subscription_status, businesses.subscription_exempt
      FROM users
      JOIN businesses ON businesses.id = users.business_id
      WHERE users.email = $1`,
@@ -92,7 +100,7 @@ export async function verifyCredentials(email, password) {
   return {
     userId: user.user_id,
     businessId: user.business_id,
-    subscriptionStatus: user.subscription_status,
+    subscriptionStatus: effectiveSubscriptionStatus(user),
   };
 }
 
@@ -191,18 +199,18 @@ export async function verifyGoogleIdToken(credential) {
 //    crear algo a medias.
 export async function findOrCreateGoogleUser({ googleId, email, businessName }) {
   const byGoogleId = await pool.query(
-    `SELECT users.id AS user_id, users.business_id, businesses.subscription_status
+    `SELECT users.id AS user_id, users.business_id, businesses.subscription_status, businesses.subscription_exempt
      FROM users JOIN businesses ON businesses.id = users.business_id
      WHERE users.google_id = $1`,
     [googleId]
   );
   if (byGoogleId.rows[0]) {
     const u = byGoogleId.rows[0];
-    return { userId: u.user_id, businessId: u.business_id, subscriptionStatus: u.subscription_status };
+    return { userId: u.user_id, businessId: u.business_id, subscriptionStatus: effectiveSubscriptionStatus(u) };
   }
 
   const byEmail = await pool.query(
-    `SELECT users.id AS user_id, users.business_id, businesses.subscription_status
+    `SELECT users.id AS user_id, users.business_id, businesses.subscription_status, businesses.subscription_exempt
      FROM users JOIN businesses ON businesses.id = users.business_id
      WHERE users.email = $1`,
     [email]
@@ -210,7 +218,7 @@ export async function findOrCreateGoogleUser({ googleId, email, businessName }) 
   if (byEmail.rows[0]) {
     const u = byEmail.rows[0];
     await pool.query('UPDATE users SET google_id = $1 WHERE id = $2', [googleId, u.user_id]);
-    return { userId: u.user_id, businessId: u.business_id, subscriptionStatus: u.subscription_status };
+    return { userId: u.user_id, businessId: u.business_id, subscriptionStatus: effectiveSubscriptionStatus(u) };
   }
 
   if (!businessName || String(businessName).trim() === '') {
