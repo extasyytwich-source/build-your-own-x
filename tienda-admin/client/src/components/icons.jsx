@@ -232,6 +232,31 @@ export function IconFileText(props) {
   );
 }
 
+export function IconChevronDown(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+export function IconShieldCheck(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+export function IconArrowRight(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
 export function IconRefreshCw(props) {
   return (
     <svg viewBox="0 0 24 24" {...base} {...props}>

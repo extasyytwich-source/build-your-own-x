@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
-function useCountUp(value, duration = 700) {
+export function useCountUp(value, duration = 700) {
   const [display, setDisplay] = useState(0);
 
   useEffect(() => {
