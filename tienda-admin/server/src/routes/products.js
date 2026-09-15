@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { toCsv, sendCsv } from '../csv.js';
+import { broadcast } from '../events.js';
 
 export const productsRouter = Router();
 
@@ -112,7 +113,9 @@ productsRouter.post('/', (req, res) => {
       );
 
     const row = db.prepare('SELECT * FROM products WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json(serializeProduct(row));
+    const product = serializeProduct(row);
+    broadcast('product', { action: 'created', name: product.name }, req.headers['x-client-id']);
+    res.status(201).json(product);
   } catch (err) {
     if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
       return res.status(409).json({ error: 'Ya existe un producto con ese SKU' });
@@ -150,7 +153,9 @@ productsRouter.put('/:id', (req, res) => {
     );
 
     const row = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
-    res.json(serializeProduct(row));
+    const product = serializeProduct(row);
+    broadcast('product', { action: 'updated', name: product.name }, req.headers['x-client-id']);
+    res.json(product);
   } catch (err) {
     if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
       return res.status(409).json({ error: 'Ya existe un producto con ese SKU' });
@@ -160,9 +165,11 @@ productsRouter.put('/:id', (req, res) => {
 });
 
 productsRouter.delete('/:id', (req, res) => {
+  const existing = db.prepare('SELECT name FROM products WHERE id = ?').get(req.params.id);
   const result = db.prepare('DELETE FROM products WHERE id = ?').run(req.params.id);
   if (result.changes === 0) {
     return res.status(404).json({ error: 'Producto no encontrado' });
   }
+  broadcast('product', { action: 'deleted', name: existing?.name }, req.headers['x-client-id']);
   res.json({ ok: true });
 });

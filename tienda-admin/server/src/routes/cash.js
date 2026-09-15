@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../db.js';
 import { monthRange } from '../dates.js';
 import { toCsv, sendCsv } from '../csv.js';
+import { broadcast } from '../events.js';
 
 export const cashRouter = Router();
 
@@ -64,7 +65,9 @@ cashRouter.post('/', (req, res) => {
     .run(entryDate, type, amt, note || null);
 
   const row = db.prepare('SELECT * FROM cash_entries WHERE id = ?').get(result.lastInsertRowid);
-  res.status(201).json(serializeCashEntry(row));
+  const entry = serializeCashEntry(row);
+  broadcast('cash', { action: 'created', entryType: entry.type }, req.headers['x-client-id']);
+  res.status(201).json(entry);
 });
 
 cashRouter.delete('/:id', (req, res) => {
@@ -72,5 +75,6 @@ cashRouter.delete('/:id', (req, res) => {
   if (result.changes === 0) {
     return res.status(404).json({ error: 'Registro no encontrado' });
   }
+  broadcast('cash', { action: 'deleted' }, req.headers['x-client-id']);
   res.json({ ok: true });
 });

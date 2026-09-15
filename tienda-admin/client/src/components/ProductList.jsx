@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useLiveUpdates } from '../context/LiveUpdatesContext.jsx';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner.js';
 import ProductFormModal from './ProductFormModal.jsx';
 import MovementModal from './MovementModal.jsx';
@@ -35,6 +36,7 @@ export default function ProductList() {
 
   const { handleUnauthorized } = useAuth();
   const { notify } = useToast();
+  const { lastEvent } = useLiveUpdates();
 
   async function loadProducts() {
     setLoading(true);
@@ -59,8 +61,10 @@ export default function ProductList() {
   useEffect(() => {
     const timeout = setTimeout(loadProducts, 250);
     return () => clearTimeout(timeout);
+    // Se vuelve a pedir también cuando otra pantalla conectada registra un
+    // movimiento o cambia un producto, para reflejar el stock al día.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, category]);
+  }, [search, category, lastEvent]);
 
   async function handleCreateOrUpdate(form) {
     if (editing) {

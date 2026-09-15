@@ -1,5 +1,11 @@
 const TOKEN_KEY = 'tienda_admin_token';
 
+// Identifica esta pestaña/dispositivo frente a las demás conectadas al mismo
+// panel (la caja, el teléfono, etc.), para que las actualizaciones en tiempo
+// real no le muestren a cada quien un aviso de su propia acción.
+export const CLIENT_ID =
+  (typeof crypto !== 'undefined' && crypto.randomUUID?.()) || Math.random().toString(36).slice(2);
+
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -10,7 +16,7 @@ export function setToken(token) {
 }
 
 async function request(path, { method = 'GET', body, auth = true } = {}) {
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = { 'Content-Type': 'application/json', 'X-Client-Id': CLIENT_ID };
   if (auth) {
     const token = getToken();
     if (token) headers.Authorization = `Bearer ${token}`;

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useLiveUpdates } from '../context/LiveUpdatesContext.jsx';
 import StatCard from './StatCard.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import { IconBox, IconCoins, IconAlertTriangle, IconTrendingUp } from './icons.jsx';
@@ -15,6 +16,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const { handleUnauthorized } = useAuth();
   const { notify } = useToast();
+  const { lastEvent } = useLiveUpdates();
 
   useEffect(() => {
     let active = true;
@@ -30,6 +32,13 @@ export default function Dashboard() {
       active = false;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    // Actualización silenciosa cuando otra pantalla conectada (la caja, el
+    // teléfono) registra algo — sin mostrar de nuevo el spinner de carga.
+    if (!lastEvent) return;
+    api.getStats().then(setStats).catch(() => {});
+  }, [lastEvent]);
 
   if (loading) {
     return <LoadingSpinner label="Cargando panel…" />;

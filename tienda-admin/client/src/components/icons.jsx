@@ -177,6 +177,17 @@ export function IconBarcode(props) {
   );
 }
 
+export function IconWifi(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M2 8.82a16 16 0 0 1 20 0" />
+      <path d="M5 12.6a11 11 0 0 1 14 0" />
+      <path d="M8.5 16.4a6 6 0 0 1 7 0" />
+      <circle cx="12" cy="19.5" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function IconSmartphone(props) {
   return (
     <svg viewBox="0 0 24 24" {...base} {...props}>

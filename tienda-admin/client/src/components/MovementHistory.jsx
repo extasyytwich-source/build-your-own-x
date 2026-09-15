@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useLiveUpdates } from '../context/LiveUpdatesContext.jsx';
 import { IconPlusCircle, IconMinusCircle, IconWrench, IconReceipt } from './icons.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import EmptyState from './EmptyState.jsx';
@@ -19,6 +20,7 @@ export default function MovementHistory() {
   const [loading, setLoading] = useState(true);
   const { handleUnauthorized } = useAuth();
   const { notify } = useToast();
+  const { lastEvent } = useLiveUpdates();
 
   useEffect(() => {
     setLoading(true);
@@ -32,8 +34,10 @@ export default function MovementHistory() {
         notify(err.message, 'error');
       })
       .finally(() => setLoading(false));
+    // Se vuelve a pedir también cuando otra pantalla conectada (la caja, el
+    // teléfono) registra un movimiento, para que el historial se vea al día.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type]);
+  }, [type, lastEvent]);
 
   return (
     <div>

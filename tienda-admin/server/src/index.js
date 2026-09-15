@@ -14,6 +14,7 @@ import { statsRouter } from './routes/stats.js';
 import { cashRouter } from './routes/cash.js';
 import { reportsRouter } from './routes/reports.js';
 import { settingsRouter } from './routes/settings.js';
+import { eventsRouter } from './routes/events.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Cuando el cliente ya está compilado (npm run build, o empaquetado en la app
@@ -35,6 +36,9 @@ export function createApp() {
   app.get('/api/health', (req, res) => res.json({ ok: true }));
 
   app.use('/api/auth', authRouter);
+  // Sin requireAuth: EventSource no puede mandar el header Authorization,
+  // así que el token se valida a mano dentro de este router (por query param).
+  app.use('/api/events', eventsRouter);
   app.use('/api/products', requireAuth, productsRouter);
   app.use('/api/movements', requireAuth, movementsRouter);
   app.use('/api/stats', requireAuth, statsRouter);

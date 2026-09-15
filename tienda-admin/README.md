@@ -27,6 +27,13 @@ pensado para correr en la computadora de la tienda y solo se accede con un PIN.
   para no tener que regenerarlo cada vez que abres la página.
 - **Acceso con PIN**: pantalla de bloqueo antes de entrar al panel, con
   posibilidad de cambiar el PIN desde Ajustes.
+- **Todo conectado en tiempo real**: la computadora del dueño, la de la caja
+  y el teléfono pueden estar abiertos al mismo tiempo (todos apuntando a la
+  misma computadora, la que corre el programa). Cuando cualquiera registra
+  un movimiento, agrega un producto o anota un ingreso/faltante de caja, las
+  demás pantallas lo ven aparecer solas — con un aviso de qué pasó y dónde —
+  sin recargar la página. El indicador "En vivo" de la barra lateral confirma
+  que la conexión está activa.
 - **Lector de código de barras**: en Productos, escanear el código de un
   producto (usando su SKU) abre directo el modal de "Registrar movimiento" —
   no hace falta buscarlo a mano. Funciona con cualquier lector USB/Bluetooth
@@ -117,16 +124,27 @@ el navegador del teléfono dé acceso a la cámara al escanear códigos de barra
 el panel por la IP de la red local, no solo "localhost"). Para forzar HTTP
 en ese modo (por ejemplo, mientras depuras) usa `HTTPS=false npm start`.
 
-### Usar el panel desde el teléfono (escanear con la cámara)
+### Usar el panel desde el teléfono o desde otra computadora (por ejemplo, la caja)
 
-1. Abre **Ajustes** en la computadora → sección "Usar desde tu teléfono".
-2. Escanea el código QR con la cámara del teléfono (o escribe a mano la
-   dirección que se muestra ahí), estando en la misma red Wi-Fi que la tienda.
-3. La primera vez el navegador del teléfono va a mostrar una advertencia de
-   seguridad ("conexión no privada"): es porque el certificado es propio de
-   esa computadora, no de una entidad pública reconocida. Toca "Avanzado" y
-   "Continuar de todas formas" — solo hace falta una vez.
-4. Entra con el mismo PIN y usa "Escanear con cámara" en Productos.
+La computadora que corre el programa (con la app de escritorio, o con
+`npm start` en modo producción) es la única que tiene la base de datos. Cualquier
+otro dispositivo en la misma red Wi-Fi/Ethernet — el teléfono, o una segunda
+computadora en la caja registradora — puede abrir el panel apuntando a esa
+computadora, y verá los mismos datos en tiempo real.
+
+1. Abre **Ajustes** en la computadora principal → sección "Usar desde tu
+   teléfono". Ahí sale la dirección (`https://IP-de-esa-computadora:puerto`)
+   y un código QR.
+2. Desde el otro dispositivo, escanea el QR con la cámara (o escribe la
+   dirección a mano en el navegador), estando en la misma red.
+3. La primera vez el navegador va a mostrar una advertencia de seguridad
+   ("conexión no privada"): es porque el certificado es propio de esa
+   computadora, no de una entidad pública reconocida. Toca "Avanzado" y
+   "Continuar de todas formas" — solo hace falta una vez por dispositivo.
+4. Entra con el mismo PIN. Desde ahí ya se puede usar "Escanear con cámara"
+   en Productos, y cualquier movimiento, producto o registro de caja que se
+   haga en cualquiera de las pantallas conectadas aparece solo en las demás
+   (ver "Todo conectado en tiempo real" más arriba).
 
 ## Entregarlo como programa de escritorio (recomendado)
 

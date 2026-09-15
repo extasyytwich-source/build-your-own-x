@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { toCsv, sendCsv } from '../csv.js';
+import { broadcast } from '../events.js';
 
 export const movementsRouter = Router();
 
@@ -112,7 +113,13 @@ movementsRouter.post('/', (req, res) => {
 
   try {
     const row = registerMovement(productId, type, qty, note);
-    res.status(201).json(serializeMovement(row));
+    const movement = serializeMovement(row);
+    broadcast(
+      'movement',
+      { productName: movement.productName, type: movement.type, quantity: movement.quantity },
+      req.headers['x-client-id']
+    );
+    res.status(201).json(movement);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message || 'Error interno' });
   }

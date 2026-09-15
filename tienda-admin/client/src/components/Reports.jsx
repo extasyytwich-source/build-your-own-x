@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useLiveUpdates } from '../context/LiveUpdatesContext.jsx';
 import StatCard from './StatCard.jsx';
 import SelectableOption from './SelectableOption.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
@@ -48,9 +49,10 @@ export default function Reports() {
 
   const { handleUnauthorized } = useAuth();
   const { notify } = useToast();
+  const { lastEvent } = useLiveUpdates();
 
-  async function loadAll() {
-    setLoading(true);
+  async function loadAll({ silent = false } = {}) {
+    if (!silent) setLoading(true);
     try {
       const [reportData, cashData, analysisData] = await Promise.all([
         api.getMonthlyReport(month),
@@ -63,9 +65,9 @@ export default function Reports() {
       setAiError('');
     } catch (err) {
       if (err.status === 401) return handleUnauthorized();
-      notify(err.message, 'error');
+      if (!silent) notify(err.message, 'error');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
@@ -73,6 +75,14 @@ export default function Reports() {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month]);
+
+  useEffect(() => {
+    // Actualización silenciosa cuando otra pantalla conectada registra un
+    // movimiento o un cobro/faltante de caja — sin tapar el reporte con el spinner.
+    if (!lastEvent) return;
+    loadAll({ silent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastEvent]);
 
   async function handleGenerateAnalysis() {
     setGenerating(true);

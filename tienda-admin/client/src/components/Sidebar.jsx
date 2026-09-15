@@ -1,6 +1,16 @@
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext.jsx';
-import { IconGrid, IconBox, IconReceipt, IconTrendingUp, IconSettings, IconLogOut, IconStore } from './icons.jsx';
+import { useLiveUpdates } from '../context/LiveUpdatesContext.jsx';
+import {
+  IconGrid,
+  IconBox,
+  IconReceipt,
+  IconTrendingUp,
+  IconSettings,
+  IconLogOut,
+  IconStore,
+  IconWifi,
+} from './icons.jsx';
 
 const ICONS = {
   dashboard: IconGrid,
@@ -12,6 +22,7 @@ const ICONS = {
 
 export default function Sidebar({ views, active, onNavigate }) {
   const { logout } = useAuth();
+  const { connected } = useLiveUpdates();
 
   return (
     <aside className="flex w-20 shrink-0 flex-col items-center gap-2 bg-black py-6 sm:w-56 sm:items-stretch sm:px-4">
@@ -63,6 +74,25 @@ export default function Sidebar({ views, active, onNavigate }) {
           );
         })}
       </nav>
+
+      <div
+        className={`mb-1 flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-medium sm:justify-start ${
+          connected ? 'text-emerald-400' : 'text-zinc-600'
+        }`}
+        title={
+          connected
+            ? 'Conectado en tiempo real con las demás pantallas (caja, teléfono)'
+            : 'Sin conexión en tiempo real'
+        }
+      >
+        <motion.span
+          animate={connected ? { opacity: [1, 0.4, 1] } : { opacity: 1 }}
+          transition={{ duration: 2, repeat: connected ? Infinity : 0 }}
+        >
+          <IconWifi className="h-4 w-4" />
+        </motion.span>
+        <span className="hidden sm:block">{connected ? 'En vivo' : 'Sin conexión'}</span>
+      </div>
 
       <motion.button
         onClick={logout}
