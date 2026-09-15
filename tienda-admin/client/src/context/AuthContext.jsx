@@ -5,41 +5,56 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // 'owner' (el dueño, ve todo) o 'cajero' (un empleado, solo ve Caja).
+  const [role, setRole] = useState(null);
+  const [name, setName] = useState(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const [checkingSubscription, setCheckingSubscription] = useState(true);
 
+  function clearSession() {
+    setIsAuthenticated(false);
+    setRole(null);
+    setName(null);
+    setSubscriptionStatus(null);
+  }
+
   // La sesión vive en una cookie httpOnly: este cliente no puede leerla, así
   // que al cargar la página la única forma de saber si ya había una sesión
-  // es preguntarle al servidor (reaprovecha /billing/status, que de paso
-  // trae el estado de la suscripción).
+  // (y con qué rol) es preguntarle al servidor.
   useEffect(() => {
     api
-      .getBillingStatus()
-      .then((status) => {
+      .getMe()
+      .then((me) => {
         setIsAuthenticated(true);
-        setSubscriptionStatus(status.subscriptionStatus);
+        setRole(me.role);
+        setName(me.name);
+        return api.getBillingStatus();
       })
-      .catch(() => {
-        setIsAuthenticated(false);
-        setSubscriptionStatus(null);
-      })
+      .then((status) => setSubscriptionStatus(status.subscriptionStatus))
+      .catch(clearSession)
       .finally(() => setCheckingSubscription(false));
   }, []);
 
   const value = useMemo(
     () => ({
       isAuthenticated,
+      role,
+      name,
       subscriptionStatus,
       checkingSubscription,
       async signup(businessName, email, password) {
-        const { subscriptionStatus: status } = await api.signup(businessName, email, password);
+        const result = await api.signup(businessName, email, password);
         setIsAuthenticated(true);
-        setSubscriptionStatus(status);
+        setRole(result.role);
+        setName(null);
+        setSubscriptionStatus(result.subscriptionStatus);
       },
-      async login(email, password) {
-        const { subscriptionStatus: status } = await api.login(email, password);
+      async login(identifier, password) {
+        const result = await api.login(identifier, password);
         setIsAuthenticated(true);
-        setSubscriptionStatus(status);
+        setRole(result.role);
+        setName(result.name ?? null);
+        setSubscriptionStatus(result.subscriptionStatus);
       },
       // Devuelve needsBusinessName cuando es una cuenta de Google nueva y
       // todavía no sabemos el nombre del negocio (ver LoginGate.jsx).
@@ -47,6 +62,8 @@ export function AuthProvider({ children }) {
         const result = await api.loginWithGoogle(credential, businessName);
         if (result.needsBusinessName) return result;
         setIsAuthenticated(true);
+        setRole(result.role);
+        setName(null);
         setSubscriptionStatus(result.subscriptionStatus);
         return result;
       },
@@ -61,15 +78,13 @@ export function AuthProvider({ children }) {
         } catch {
           // Si falla el pedido igual cerramos la sesión del lado del cliente.
         }
-        setIsAuthenticated(false);
-        setSubscriptionStatus(null);
+        clearSession();
       },
       handleUnauthorized() {
-        setIsAuthenticated(false);
-        setSubscriptionStatus(null);
+        clearSession();
       },
     }),
-    [isAuthenticated, subscriptionStatus, checkingSubscription]
+    [isAuthenticated, role, name, subscriptionStatus, checkingSubscription]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

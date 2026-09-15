@@ -68,7 +68,9 @@ movementsRouter.get('/export.csv', async (req, res) => {
   sendCsv(res, 'movimientos.csv', csv);
 });
 
-async function registerMovement(client, businessId, productId, type, quantity, note) {
+// Exportada para que routes/sales.js registre cada línea del carrito como
+// la misma "salida" de siempre, etiquetada con el saleId del ticket.
+export async function registerMovement(client, businessId, productId, type, quantity, note, saleId = null) {
   const { rows: productRows } = await client.query(
     'SELECT * FROM products WHERE business_id = $1 AND id = $2 FOR UPDATE',
     [businessId, productId]
@@ -86,7 +88,7 @@ async function registerMovement(client, businessId, productId, type, quantity, n
   else newStock = quantity; // ajuste: fija el stock al valor indicado
 
   if (newStock < 0) {
-    const err = new Error('No hay suficiente stock disponible para esta salida');
+    const err = new Error(`No hay suficiente stock de "${product.name}" para esta salida`);
     err.status = 400;
     throw err;
   }
@@ -97,10 +99,10 @@ async function registerMovement(client, businessId, productId, type, quantity, n
   ]);
 
   const { rows } = await client.query(
-    `INSERT INTO movements (business_id, product_id, type, quantity, stock_after, note, unit_price, unit_cost)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO movements (business_id, product_id, type, quantity, stock_after, note, unit_price, unit_cost, sale_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING id`,
-    [businessId, productId, type, quantity, newStock, note || null, product.price, product.cost]
+    [businessId, productId, type, quantity, newStock, note || null, product.price, product.cost, saleId]
   );
 
   const { rows: joined } = await client.query(`${MOVEMENTS_QUERY} WHERE movements.id = $1`, [

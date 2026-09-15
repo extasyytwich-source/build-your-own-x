@@ -5,7 +5,7 @@ import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
-import { IconDownload, IconUpload, IconFileText, IconSmartphone } from './icons.jsx';
+import { IconDownload, IconUpload, IconFileText, IconSmartphone, IconUsers, IconX } from './icons.jsx';
 
 const SUBSCRIPTION_LABELS = {
   activa: 'Activa',
@@ -40,13 +40,61 @@ export default function Settings() {
   const [hasPassword, setHasPassword] = useState(true);
   const { notify } = useToast();
 
+  const [employees, setEmployees] = useState([]);
+  const [newEmployeeName, setNewEmployeeName] = useState('');
+  const [newEmployeeUsername, setNewEmployeeUsername] = useState('');
+  const [newEmployeePassword, setNewEmployeePassword] = useState('');
+  const [creatingEmployee, setCreatingEmployee] = useState(false);
+  const [deleteEmployeeTarget, setDeleteEmployeeTarget] = useState(null);
+  const [removingEmployee, setRemovingEmployee] = useState(false);
+
   const panelUrl = typeof window !== 'undefined' ? window.location.origin : '';
+
+  function loadEmployees() {
+    api.getEmployees().then(setEmployees).catch(() => {});
+  }
 
   useEffect(() => {
     api.getAiSettings().then(setAiStatus).catch(() => {});
     api.getBillingStatus().then(setBilling).catch(() => {});
     api.getMe().then((me) => setHasPassword(me.hasPassword)).catch(() => {});
+    loadEmployees();
   }, []);
+
+  async function handleCreateEmployee(e) {
+    e.preventDefault();
+    setCreatingEmployee(true);
+    try {
+      await api.createEmployee({
+        name: newEmployeeName,
+        username: newEmployeeUsername,
+        password: newEmployeePassword,
+      });
+      notify('Empleado agregado');
+      setNewEmployeeName('');
+      setNewEmployeeUsername('');
+      setNewEmployeePassword('');
+      loadEmployees();
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setCreatingEmployee(false);
+    }
+  }
+
+  async function handleRemoveEmployee() {
+    setRemovingEmployee(true);
+    try {
+      await api.deleteEmployee(deleteEmployeeTarget.id);
+      notify('Empleado eliminado');
+      loadEmployees();
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setRemovingEmployee(false);
+      setDeleteEmployeeTarget(null);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -255,6 +303,74 @@ export default function Settings() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08 }}
+        className="card mt-6 max-w-sm p-6"
+      >
+        <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+          <IconUsers className="h-4 w-4" />
+          Empleados
+        </h2>
+        <p className="mb-4 text-xs text-slate-500">
+          Cada empleado entra con su propio usuario y contraseña, directo a la pantalla de Caja —
+          no ve productos, historial, reportes ni ajustes.
+        </p>
+
+        {employees.length > 0 && (
+          <ul className="mb-4 space-y-1.5">
+            {employees.map((emp) => (
+              <li
+                key={emp.id}
+                className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm"
+              >
+                <span>
+                  <span className="font-medium text-slate-700">{emp.name}</span>
+                  <span className="ml-2 text-xs text-slate-400">@{emp.username}</span>
+                </span>
+                <button
+                  onClick={() => setDeleteEmployeeTarget(emp)}
+                  className="text-slate-300 hover:text-rose-500"
+                  aria-label={`Quitar a ${emp.name}`}
+                >
+                  <IconX className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <form onSubmit={handleCreateEmployee} className="space-y-3">
+          <input
+            required
+            className="input"
+            placeholder="Nombre del empleado"
+            value={newEmployeeName}
+            onChange={(e) => setNewEmployeeName(e.target.value)}
+          />
+          <input
+            required
+            className="input"
+            placeholder="Usuario (con el que va a entrar)"
+            value={newEmployeeUsername}
+            onChange={(e) => setNewEmployeeUsername(e.target.value)}
+          />
+          <input
+            required
+            type="password"
+            minLength={8}
+            className="input"
+            placeholder="Contraseña"
+            value={newEmployeePassword}
+            onChange={(e) => setNewEmployeePassword(e.target.value)}
+          />
+          <button type="submit" disabled={creatingEmployee} className="btn-secondary w-full">
+            {creatingEmployee ? 'Agregando…' : 'Agregar empleado'}
+          </button>
+        </form>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
         className="card mt-6 max-w-sm p-6"
       >
@@ -386,6 +502,15 @@ export default function Settings() {
         title="Restaurar respaldo"
         message={`Esto reemplazará todos los productos, movimientos y registros de caja actuales por los del archivo "${restoreFile?.name}". Esta acción no se puede deshacer. ¿Continuar?`}
         confirmLabel={restoring ? 'Restaurando…' : 'Restaurar'}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteEmployeeTarget)}
+        onClose={() => setDeleteEmployeeTarget(null)}
+        onConfirm={handleRemoveEmployee}
+        title="Quitar empleado"
+        message={`"${deleteEmployeeTarget?.name}" ya no va a poder iniciar sesión.`}
+        confirmLabel={removingEmployee ? 'Quitando…' : 'Quitar'}
       />
 
       <ConfirmDialog

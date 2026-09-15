@@ -13,7 +13,19 @@ const EMPTY = {
   minStock: '',
   unit: 'unidad',
   description: '',
+  taxCategory: 'general',
 };
+
+// Las tasas son ley (Chile: IVA 19% + impuesto adicional a bebidas según
+// DL 825 art. 42) — ver server/src/tax.js. Acá el dueño solo elige la
+// categoría del producto, no escribe ningún número.
+const TAX_CATEGORIES = [
+  { value: 'general', label: 'General (19% IVA)' },
+  { value: 'alcohol_mas_20', label: 'Bebida alcohólica >20° (19% + 31,5%)' },
+  { value: 'alcohol_hasta_20', label: 'Bebida alcohólica ≤20° (19% + 20,5%)' },
+  { value: 'bebida_azucarada', label: 'Bebida azucarada (19% + 18%)' },
+  { value: 'exento', label: 'Exento' },
+];
 
 export default function ProductFormModal({ open, onClose, onSubmit, product, initialSku = '' }) {
   const [form, setForm] = useState(EMPTY);
@@ -35,6 +47,7 @@ export default function ProductFormModal({ open, onClose, onSubmit, product, ini
               minStock: product.minStock,
               unit: product.unit,
               description: product.description || '',
+              taxCategory: product.taxCategory || 'general',
             }
           : { ...EMPTY, sku: initialSku }
       );
@@ -101,6 +114,21 @@ export default function ProductFormModal({ open, onClose, onSubmit, product, ini
             onChange={(e) => update('category', e.target.value)}
             placeholder="Ej. Bebidas"
           />
+        </div>
+
+        <div className="col-span-2">
+          <label className="label">Categoría de impuesto</label>
+          <select
+            className="input"
+            value={form.taxCategory}
+            onChange={(e) => update('taxCategory', e.target.value)}
+          >
+            {TAX_CATEGORIES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>

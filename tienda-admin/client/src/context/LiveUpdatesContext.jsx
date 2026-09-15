@@ -15,6 +15,8 @@ const MESSAGES = {
         ? `Producto eliminado: ${e.name}`
         : `Producto actualizado: ${e.name}`,
   cash: (e) => (e.action === 'created' ? 'Nuevo registro de caja' : 'Registro de caja eliminado'),
+  sale: (e) =>
+    `Venta registrada: ${e.items} producto${e.items === 1 ? '' : 's'} por ${Number(e.total).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })}`,
 };
 
 // Mantiene una sola conexión en tiempo real (Server-Sent Events) mientras

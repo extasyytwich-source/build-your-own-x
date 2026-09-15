@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
-import { requireAuth } from '../auth.js';
+import { requireAuth, requireOwner } from '../auth.js';
 import {
   createPayment,
   getPaymentStatus,
@@ -27,7 +27,7 @@ billingRouter.get('/status', requireAuth, async (req, res) => {
   });
 });
 
-billingRouter.post('/subscribe', requireAuth, async (req, res) => {
+billingRouter.post('/subscribe', requireAuth, requireOwner, async (req, res) => {
   const businessId = req.businessId;
 
   // Atajo solo para desarrollo local: sin llaves de Flow configuradas y
@@ -81,7 +81,7 @@ billingRouter.post('/webhook', async (req, res) => {
   }
 });
 
-billingRouter.post('/cancel', requireAuth, async (req, res) => {
+billingRouter.post('/cancel', requireAuth, requireOwner, async (req, res) => {
   await pool.query("UPDATE businesses SET subscription_status = 'cancelada' WHERE id = $1", [
     req.businessId,
   ]);

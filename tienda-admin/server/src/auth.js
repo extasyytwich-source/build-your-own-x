@@ -77,14 +77,19 @@ export async function createBusiness(businessName, email, password) {
   }
 }
 
-export async function verifyCredentials(email, password) {
+// El dueño entra con su correo; un empleado (rol 'cajero') entra con el
+// usuario que le puso el dueño al crearlo — un mismo campo de login acepta
+// cualquiera de los dos.
+export async function verifyCredentials(identifier, password) {
+  const normalized = String(identifier).toLowerCase().trim();
   const { rows } = await pool.query(
     `SELECT users.id AS user_id, users.password_hash, users.password_salt, users.business_id,
+            users.role, users.name,
             businesses.subscription_status, businesses.subscription_exempt
      FROM users
      JOIN businesses ON businesses.id = users.business_id
-     WHERE users.email = $1`,
-    [email.toLowerCase().trim()]
+     WHERE users.email = $1 OR users.username = $1`,
+    [normalized]
   );
   const user = rows[0];
   // Sin password_hash es una cuenta creada con Google que nunca puso
@@ -100,8 +105,33 @@ export async function verifyCredentials(email, password) {
   return {
     userId: user.user_id,
     businessId: user.business_id,
+    role: user.role,
+    name: user.name,
     subscriptionStatus: effectiveSubscriptionStatus(user),
   };
+}
+
+// El dueño registra al empleado desde Ajustes (no hay autoregistro): entra
+// con usuario+contraseña, sin correo — no necesita una casilla real.
+export async function createEmployee(businessId, { name, username, password }) {
+  const normalizedUsername = String(username).toLowerCase().trim();
+  const salt = crypto.randomBytes(16).toString('hex');
+  const passwordHash = hashPassword(password, salt);
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO users (business_id, username, name, password_hash, password_salt, role)
+       VALUES ($1, $2, $3, $4, $5, 'cajero') RETURNING id, name, username, created_at`,
+      [businessId, normalizedUsername, name.trim(), passwordHash, salt]
+    );
+    return rows[0];
+  } catch (err) {
+    if (err.code === '23505') {
+      const e = new Error('Ya existe una cuenta con ese usuario');
+      e.status = 409;
+      throw e;
+    }
+    throw err;
+  }
 }
 
 export async function hasPassword(userId) {
@@ -119,8 +149,8 @@ export async function updatePassword(userId, newPassword) {
   ]);
 }
 
-export function issueToken({ userId, businessId }) {
-  return jwt.sign({ userId, businessId }, JWT_SECRET, { expiresIn: JWT_TTL_MS / 1000 });
+export function issueToken({ userId, businessId, role }) {
+  return jwt.sign({ userId, businessId, role }, JWT_SECRET, { expiresIn: JWT_TTL_MS / 1000 });
 }
 
 export function verifyToken(token) {
@@ -154,6 +184,16 @@ export function requireAuth(req, res, next) {
   if (!payload) return res.status(401).json({ error: 'No autorizado' });
   req.userId = payload.userId;
   req.businessId = payload.businessId;
+  req.role = payload.role;
+  next();
+}
+
+// Un cajero solo puede vender (ver productos, escanear, registrar una
+// venta); todo lo demás —productos, historial, reportes, caja, ajustes,
+// empleados, suscripción— es exclusivo del dueño del negocio. Se monta
+// siempre después de requireAuth.
+export function requireOwner(req, res, next) {
+  if (req.role !== 'owner') return res.status(403).json({ error: 'Necesitas ser el dueño del negocio' });
   next();
 }
 

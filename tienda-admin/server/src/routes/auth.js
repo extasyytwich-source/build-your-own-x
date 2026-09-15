@@ -32,28 +32,30 @@ authRouter.post('/signup', async (req, res) => {
 
   try {
     const { businessId, userId } = await createBusiness(businessName, email, password);
-    const token = issueToken({ userId, businessId });
+    const token = issueToken({ userId, businessId, role: 'owner' });
     setSessionCookie(res, token);
-    res.status(201).json({ subscriptionStatus: 'pendiente_pago' });
+    res.status(201).json({ subscriptionStatus: 'pendiente_pago', role: 'owner' });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message || 'Error interno' });
   }
 });
 
+// "identifier" es el correo del dueño o el usuario de un empleado — un
+// mismo campo de login sirve para ambos (ver auth.js: verifyCredentials).
 authRouter.post('/login', async (req, res) => {
-  const { email, password } = req.body ?? {};
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Falta el correo o la contraseña' });
+  const { identifier, password } = req.body ?? {};
+  if (!identifier || !password) {
+    return res.status(400).json({ error: 'Falta el correo/usuario o la contraseña' });
   }
 
-  const result = await verifyCredentials(email, password);
+  const result = await verifyCredentials(identifier, password);
   if (!result) {
-    return res.status(401).json({ error: 'Correo o contraseña incorrectos' });
+    return res.status(401).json({ error: 'Correo/usuario o contraseña incorrectos' });
   }
 
-  const token = issueToken({ userId: result.userId, businessId: result.businessId });
+  const token = issueToken({ userId: result.userId, businessId: result.businessId, role: result.role });
   setSessionCookie(res, token);
-  res.json({ subscriptionStatus: result.subscriptionStatus });
+  res.json({ subscriptionStatus: result.subscriptionStatus, role: result.role, name: result.name });
 });
 
 // Verifica el ID token que entrega el botón de Google (Google Identity
@@ -75,9 +77,9 @@ authRouter.post('/google', async (req, res) => {
       return res.json({ needsBusinessName: true });
     }
 
-    const token = issueToken({ userId: result.userId, businessId: result.businessId });
+    const token = issueToken({ userId: result.userId, businessId: result.businessId, role: 'owner' });
     setSessionCookie(res, token);
-    res.json({ subscriptionStatus: result.subscriptionStatus });
+    res.json({ subscriptionStatus: result.subscriptionStatus, role: 'owner' });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message || 'Error interno' });
   }
@@ -91,10 +93,20 @@ authRouter.post('/logout', requireAuth, (req, res) => {
 });
 
 // Usado por Ajustes para saber si mostrar el campo "contraseña actual" (una
-// cuenta creada con Google puede no tener ninguna todavía).
+// cuenta creada con Google puede no tener ninguna todavía) y por el
+// frontend para decidir qué pantalla mostrar según el rol.
 authRouter.get('/me', requireAuth, async (req, res) => {
-  const { rows } = await pool.query('SELECT email FROM users WHERE id = $1', [req.userId]);
-  res.json({ email: rows[0]?.email ?? null, hasPassword: await hasPassword(req.userId) });
+  const { rows } = await pool.query('SELECT email, username, name, role FROM users WHERE id = $1', [
+    req.userId,
+  ]);
+  const user = rows[0];
+  res.json({
+    email: user?.email ?? null,
+    username: user?.username ?? null,
+    name: user?.name ?? null,
+    role: user?.role ?? null,
+    hasPassword: await hasPassword(req.userId),
+  });
 });
 
 authRouter.post('/change-password', requireAuth, async (req, res) => {
@@ -111,9 +123,9 @@ authRouter.post('/change-password', requireAuth, async (req, res) => {
     if (!currentPassword) {
       return res.status(400).json({ error: 'Falta la contraseña actual' });
     }
-    const { rows } = await pool.query('SELECT email FROM users WHERE id = $1', [req.userId]);
-    const email = rows[0]?.email;
-    const valid = email && (await verifyCredentials(email, currentPassword));
+    const { rows } = await pool.query('SELECT email, username FROM users WHERE id = $1', [req.userId]);
+    const identifier = rows[0]?.email || rows[0]?.username;
+    const valid = identifier && (await verifyCredentials(identifier, currentPassword));
     if (!valid) {
       return res.status(401).json({ error: 'La contraseña actual no es correcta' });
     }
