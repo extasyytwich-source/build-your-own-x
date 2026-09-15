@@ -14,12 +14,12 @@ export default function Sidebar({ views, active, onNavigate }) {
   const { logout } = useAuth();
 
   return (
-    <aside className="flex w-20 shrink-0 flex-col items-center gap-2 border-r border-slate-200 bg-white py-6 sm:w-56 sm:items-stretch sm:px-4">
+    <aside className="flex w-20 shrink-0 flex-col items-center gap-2 bg-black py-6 sm:w-56 sm:items-stretch sm:px-4">
       <div className="mb-6 flex items-center gap-2 px-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 text-white shadow-soft">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-black">
           <IconStore className="h-5 w-5" />
         </div>
-        <span className="hidden text-sm font-semibold text-slate-700 sm:block">
+        <span className="hidden text-sm font-semibold tracking-tight text-white sm:block">
           Panel de la Tienda
         </span>
       </div>
@@ -34,13 +34,13 @@ export default function Sidebar({ views, active, onNavigate }) {
               onClick={() => onNavigate(key)}
               whileTap={{ scale: 0.95 }}
               className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-                isActive ? 'text-brand-700' : 'text-slate-500 hover:text-slate-800'
+                isActive ? 'text-white' : 'text-zinc-500 hover:text-zinc-200'
               }`}
             >
               {isActive && (
                 <motion.span
                   layoutId="sidebar-active"
-                  className="absolute inset-0 rounded-xl bg-brand-50"
+                  className="absolute inset-0 rounded-xl bg-white/10"
                   transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                 />
               )}
@@ -52,6 +52,13 @@ export default function Sidebar({ views, active, onNavigate }) {
                 <Icon className="h-5 w-5" />
               </motion.span>
               <span className="relative z-10 hidden sm:block">{label}</span>
+              {isActive && (
+                <motion.span
+                  layoutId="sidebar-active-dot"
+                  className="absolute right-2.5 hidden h-1.5 w-1.5 rounded-full bg-white sm:block"
+                  transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                />
+              )}
             </motion.button>
           );
         })}
@@ -60,7 +67,7 @@ export default function Sidebar({ views, active, onNavigate }) {
       <motion.button
         onClick={logout}
         whileTap={{ scale: 0.95 }}
-        className="flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 sm:justify-start"
+        className="flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-zinc-500 transition-colors hover:bg-white/5 hover:text-white sm:justify-start"
       >
         <IconLogOut className="h-5 w-5" />
         <span className="hidden sm:block">Salir</span>

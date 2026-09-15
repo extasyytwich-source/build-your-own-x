@@ -24,7 +24,7 @@ export default function LoginGate() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-700 via-brand-800 to-slate-900 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-800 via-zinc-950 to-black px-4">
       <motion.form
         onSubmit={handleSubmit}
         initial={{ opacity: 0, y: 24, scale: 0.96 }}
