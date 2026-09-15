@@ -3,7 +3,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { IconPlusCircle, IconMinusCircle, IconWrench } from './icons.jsx';
+import { IconPlusCircle, IconMinusCircle, IconWrench, IconReceipt } from './icons.jsx';
+import LoadingSpinner from './LoadingSpinner.jsx';
+import EmptyState from './EmptyState.jsx';
 
 const TYPE_STYLES = {
   entrada: { label: 'Entrada', className: 'bg-emerald-50 text-emerald-700', Icon: IconPlusCircle },
@@ -93,11 +95,9 @@ export default function MovementHistory() {
           </table>
         </div>
 
-        {loading && <div className="py-12 text-center text-sm text-slate-400">Cargando…</div>}
+        {loading && <LoadingSpinner label="Cargando historial…" />}
         {!loading && movements.length === 0 && (
-          <div className="py-12 text-center text-sm text-slate-400">
-            Todavía no hay movimientos registrados.
-          </div>
+          <EmptyState icon={IconReceipt} title="Todavía no hay movimientos registrados" />
         )}
       </div>
     </div>

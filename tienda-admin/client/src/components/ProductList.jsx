@@ -6,7 +6,9 @@ import { useToast } from '../context/ToastContext.jsx';
 import ProductFormModal from './ProductFormModal.jsx';
 import MovementModal from './MovementModal.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
-import { IconAlertTriangle } from './icons.jsx';
+import LoadingSpinner from './LoadingSpinner.jsx';
+import EmptyState from './EmptyState.jsx';
+import { IconAlertTriangle, IconBox } from './icons.jsx';
 
 const currency = (n) =>
   Number(n || 0).toLocaleString('es', { style: 'currency', currency: 'USD' });
@@ -200,11 +202,13 @@ export default function ProductList() {
           </table>
         </div>
 
-        {loading && <div className="py-12 text-center text-sm text-slate-400">Cargando…</div>}
+        {loading && <LoadingSpinner label="Cargando productos…" />}
         {emptyState && (
-          <div className="py-12 text-center text-sm text-slate-400">
-            No hay productos que coincidan. Prueba agregando uno nuevo.
-          </div>
+          <EmptyState
+            icon={IconBox}
+            title="No hay productos que coincidan"
+            message="Prueba agregando uno nuevo."
+          />
         )}
       </div>
 

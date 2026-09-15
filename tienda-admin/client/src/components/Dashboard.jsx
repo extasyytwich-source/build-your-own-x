@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import StatCard from './StatCard.jsx';
+import LoadingSpinner from './LoadingSpinner.jsx';
 import { IconBox, IconCoins, IconAlertTriangle, IconTrendingUp } from './icons.jsx';
 
 const currency = (n) =>
@@ -31,7 +32,7 @@ export default function Dashboard() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
-    return <div className="py-16 text-center text-slate-400">Cargando panel…</div>;
+    return <LoadingSpinner label="Cargando panel…" />;
   }
 
   if (!stats) return null;

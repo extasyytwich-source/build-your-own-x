@@ -5,6 +5,9 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import StatCard from './StatCard.jsx';
 import SelectableOption from './SelectableOption.jsx';
+import LoadingSpinner from './LoadingSpinner.jsx';
+import EmptyState from './EmptyState.jsx';
+import { useShake } from '../hooks/useShake.js';
 import {
   IconCoins,
   IconReceipt,
@@ -41,6 +44,7 @@ export default function Reports() {
     note: '',
   });
   const [savingCash, setSavingCash] = useState(false);
+  const [cashShakeControls, shakeCashForm] = useShake();
 
   const { handleUnauthorized } = useAuth();
   const { notify } = useToast();
@@ -98,6 +102,7 @@ export default function Reports() {
       loadAll();
     } catch (err) {
       notify(err.message, 'error');
+      shakeCashForm();
     } finally {
       setSavingCash(false);
     }
@@ -126,7 +131,7 @@ export default function Reports() {
       </div>
 
       {loading || !report ? (
-        <div className="py-16 text-center text-slate-400">Cargando reporte…</div>
+        <LoadingSpinner label="Cargando reporte…" />
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -237,7 +242,11 @@ export default function Reports() {
             </p>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <form onSubmit={handleAddCashEntry} className="space-y-3">
+              <motion.form
+                animate={cashShakeControls}
+                onSubmit={handleAddCashEntry}
+                className="space-y-3"
+              >
                 <div className="grid grid-cols-2 gap-2">
                   <SelectableOption
                     selected={cashForm.type === 'ingreso'}
@@ -298,13 +307,11 @@ export default function Reports() {
                   <span>Ingresado: {currency(report.cash.registeredIncome)}</span>
                   <span>Faltante: {currency(report.cash.missingAmount)}</span>
                 </div>
-              </form>
+              </motion.form>
 
               <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-100">
                 {cashEntries.length === 0 ? (
-                  <p className="p-4 text-sm text-slate-400">
-                    No hay registros de caja este mes.
-                  </p>
+                  <EmptyState icon={IconWallet} title="Sin registros de caja este mes" />
                 ) : (
                   <ul className="divide-y divide-slate-100">
                     {cashEntries.map((entry) => (

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import Modal from './Modal.jsx';
+import { useShake } from '../hooks/useShake.js';
 
 const EMPTY = {
   name: '',
@@ -17,6 +19,7 @@ export default function ProductFormModal({ open, onClose, onSubmit, product }) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [shakeControls, shake] = useShake();
 
   useEffect(() => {
     if (open) {
@@ -51,6 +54,7 @@ export default function ProductFormModal({ open, onClose, onSubmit, product }) {
       await onSubmit(form);
     } catch (err) {
       setError(err.message);
+      shake();
     } finally {
       setSaving(false);
     }
@@ -63,7 +67,11 @@ export default function ProductFormModal({ open, onClose, onSubmit, product }) {
       title={product ? 'Editar producto' : 'Nuevo producto'}
       width="max-w-lg"
     >
-      <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
+      <motion.form
+        animate={shakeControls}
+        onSubmit={handleSubmit}
+        className="grid grid-cols-2 gap-4"
+      >
         <div className="col-span-2">
           <label className="label">Nombre*</label>
           <input
@@ -179,7 +187,7 @@ export default function ProductFormModal({ open, onClose, onSubmit, product }) {
             {saving ? 'Guardando…' : 'Guardar'}
           </button>
         </div>
-      </form>
+      </motion.form>
     </Modal>
   );
 }

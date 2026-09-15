@@ -22,14 +22,19 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  if (res.status === 401) {
+  const data = await res.json().catch(() => ({}));
+
+  // 'No autorizado' es lo único que devuelve el middleware de sesión
+  // (requireAuth) cuando el token falta o expiró. Otros 401 (PIN
+  // incorrecto al iniciar sesión o al cambiarlo) traen su propio mensaje
+  // y no deben tratarse como sesión vencida.
+  if (res.status === 401 && data.error === 'No autorizado') {
     setToken(null);
     const err = new Error('Sesión expirada, vuelve a ingresar el PIN');
     err.status = 401;
     throw err;
   }
 
-  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(data.error || 'Ocurrió un error');
     err.status = res.status;

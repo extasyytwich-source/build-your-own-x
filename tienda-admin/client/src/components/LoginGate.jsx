@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useShake } from '../hooks/useShake.js';
 import { IconLock } from './icons.jsx';
 
 export default function LoginGate() {
@@ -8,6 +9,7 @@ export default function LoginGate() {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [shakeControls, shake] = useShake();
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -18,6 +20,7 @@ export default function LoginGate() {
     } catch (err) {
       setError(err.message);
       setPin('');
+      shake();
     } finally {
       setLoading(false);
     }
@@ -44,16 +47,18 @@ export default function LoginGate() {
           Panel de la Tienda
         </h1>
 
-        <input
-          autoFocus
-          type="password"
-          inputMode="numeric"
-          maxLength={16}
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          placeholder="••••"
-          className="input mb-3 text-center text-lg tracking-[0.5em]"
-        />
+        <motion.div animate={shakeControls}>
+          <input
+            autoFocus
+            type="password"
+            inputMode="numeric"
+            maxLength={16}
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            placeholder="••••"
+            className="input mb-3 text-center text-lg tracking-[0.5em]"
+          />
+        </motion.div>
 
         {error && (
           <motion.p

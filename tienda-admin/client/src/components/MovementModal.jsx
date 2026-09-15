@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import Modal from './Modal.jsx';
 import SelectableOption from './SelectableOption.jsx';
+import { useShake } from '../hooks/useShake.js';
 import { IconMinusCircle, IconPlusCircle, IconWrench } from './icons.jsx';
 
 const TYPES = [
@@ -15,6 +17,7 @@ export default function MovementModal({ open, onClose, onSubmit, product }) {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [shakeControls, shake] = useShake();
 
   useEffect(() => {
     if (open) {
@@ -33,6 +36,7 @@ export default function MovementModal({ open, onClose, onSubmit, product }) {
       await onSubmit({ productId: product.id, type, quantity: Number(quantity), note });
     } catch (err) {
       setError(err.message);
+      shake();
     } finally {
       setSaving(false);
     }
@@ -42,7 +46,7 @@ export default function MovementModal({ open, onClose, onSubmit, product }) {
 
   return (
     <Modal open={open} onClose={onClose} title={`Registrar movimiento — ${product.name}`}>
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <motion.form animate={shakeControls} onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="label">Tipo de movimiento</label>
           <div className="flex flex-col gap-2">
@@ -98,7 +102,7 @@ export default function MovementModal({ open, onClose, onSubmit, product }) {
             {saving ? 'Registrando…' : 'Registrar'}
           </button>
         </div>
-      </form>
+      </motion.form>
     </Modal>
   );
 }
