@@ -168,13 +168,15 @@ export default function ProductList() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1.5">
-                        <button
+                        <motion.button
+                          whileTap={{ scale: 0.93 }}
                           onClick={() => setMovementProduct(p)}
                           className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50"
                         >
                           Movimiento
-                        </button>
-                        <button
+                        </motion.button>
+                        <motion.button
+                          whileTap={{ scale: 0.93 }}
                           onClick={() => {
                             setEditing(p);
                             setFormOpen(true);
@@ -182,13 +184,14 @@ export default function ProductList() {
                           className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100"
                         >
                           Editar
-                        </button>
-                        <button
+                        </motion.button>
+                        <motion.button
+                          whileTap={{ scale: 0.93 }}
                           onClick={() => setDeleteTarget(p)}
                           className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-rose-500 hover:bg-rose-50"
                         >
                           Eliminar
-                        </button>
+                        </motion.button>
                       </div>
                     </td>
                   </motion.tr>

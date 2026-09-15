@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
+import SelectableOption from './SelectableOption.jsx';
 
 const TYPES = [
   { value: 'salida', label: 'Salida (uso / venta)', icon: '➖' },
@@ -43,21 +44,17 @@ export default function MovementModal({ open, onClose, onSubmit, product }) {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="label">Tipo de movimiento</label>
-          <div className="grid grid-cols-1 gap-2">
+          <div className="flex flex-col gap-2">
             {TYPES.map((t) => (
-              <button
-                type="button"
+              <SelectableOption
                 key={t.value}
+                selected={type === t.value}
                 onClick={() => setType(t.value)}
-                className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm font-medium transition ${
-                  type === t.value
-                    ? 'border-brand-400 bg-brand-50 text-brand-700'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
+                layoutId="movement-type-highlight"
               >
                 <span>{t.icon}</span>
                 {t.label}
-              </button>
+              </SelectableOption>
             ))}
           </div>
         </div>

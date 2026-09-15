@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import StatCard from './StatCard.jsx';
+import SelectableOption from './SelectableOption.jsx';
 
 const currency = (n) =>
   Number(n || 0).toLocaleString('es', { style: 'currency', currency: 'USD' });
@@ -221,28 +222,28 @@ export default function Reports() {
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <form onSubmit={handleAddCashEntry} className="space-y-3">
                 <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
+                  <SelectableOption
+                    selected={cashForm.type === 'ingreso'}
                     onClick={() => setCashForm((f) => ({ ...f, type: 'ingreso' }))}
-                    className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
-                      cashForm.type === 'ingreso'
-                        ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
+                    layoutId="cash-type-highlight"
+                    activeClassName="border-emerald-400 text-emerald-700"
+                    highlightClassName="bg-emerald-50"
+                    showCheck={false}
+                    className="justify-center"
                   >
                     ➕ Dinero que ingresó
-                  </button>
-                  <button
-                    type="button"
+                  </SelectableOption>
+                  <SelectableOption
+                    selected={cashForm.type === 'faltante'}
                     onClick={() => setCashForm((f) => ({ ...f, type: 'faltante' }))}
-                    className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
-                      cashForm.type === 'faltante'
-                        ? 'border-rose-400 bg-rose-50 text-rose-700'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
+                    layoutId="cash-type-highlight"
+                    activeClassName="border-rose-400 text-rose-700"
+                    highlightClassName="bg-rose-50"
+                    showCheck={false}
+                    className="justify-center"
                   >
                     ➖ Dinero que falta
-                  </button>
+                  </SelectableOption>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">

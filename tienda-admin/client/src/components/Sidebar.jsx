@@ -27,9 +27,10 @@ export default function Sidebar({ views, active, onNavigate }) {
         {Object.entries(views).map(([key, { label }]) => {
           const isActive = key === active;
           return (
-            <button
+            <motion.button
               key={key}
               onClick={() => onNavigate(key)}
+              whileTap={{ scale: 0.95 }}
               className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                 isActive ? 'text-brand-700' : 'text-slate-500 hover:text-slate-800'
               }`}
@@ -41,20 +42,27 @@ export default function Sidebar({ views, active, onNavigate }) {
                   transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                 />
               )}
-              <span className="relative z-10 text-lg">{ICONS[key]}</span>
+              <motion.span
+                animate={{ scale: isActive ? 1.15 : 1 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                className="relative z-10 text-lg"
+              >
+                {ICONS[key]}
+              </motion.span>
               <span className="relative z-10 hidden sm:block">{label}</span>
-            </button>
+            </motion.button>
           );
         })}
       </nav>
 
-      <button
+      <motion.button
         onClick={logout}
+        whileTap={{ scale: 0.95 }}
         className="flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 sm:justify-start"
       >
         <span className="text-lg">🚪</span>
         <span className="hidden sm:block">Salir</span>
-      </button>
+      </motion.button>
     </aside>
   );
 }
