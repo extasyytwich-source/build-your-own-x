@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { isSessionValid } from '../auth.js';
+import { verifyToken } from '../auth.js';
 import { addSubscriber, removeSubscriber } from '../events.js';
 
 export const eventsRouter = Router();
@@ -9,7 +9,8 @@ export const eventsRouter = Router();
 // de por el middleware requireAuth normal.
 eventsRouter.get('/stream', (req, res) => {
   const token = req.query.token;
-  if (!token || !isSessionValid(String(token))) {
+  const payload = token ? verifyToken(String(token)) : null;
+  if (!payload) {
     return res.status(401).json({ error: 'No autorizado' });
   }
 
@@ -21,7 +22,7 @@ eventsRouter.get('/stream', (req, res) => {
   });
   res.write(': conectado\n\n');
 
-  addSubscriber(res);
+  addSubscriber(res, payload.businessId);
 
   // Mantiene la conexión viva a través de proxies/timeouts intermedios.
   const keepAlive = setInterval(() => res.write(': ping\n\n'), 25000);

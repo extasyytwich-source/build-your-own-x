@@ -9,7 +9,7 @@ import LoadingSpinner from './LoadingSpinner.jsx';
 import { IconBox, IconCoins, IconAlertTriangle, IconTrendingUp } from './icons.jsx';
 
 const currency = (n) =>
-  Number(n || 0).toLocaleString('es', { style: 'currency', currency: 'USD' });
+  Number(n || 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' });
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);

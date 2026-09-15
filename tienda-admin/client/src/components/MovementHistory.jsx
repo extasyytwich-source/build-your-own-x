@@ -4,7 +4,7 @@ import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useLiveUpdates } from '../context/LiveUpdatesContext.jsx';
-import { IconPlusCircle, IconMinusCircle, IconWrench, IconReceipt } from './icons.jsx';
+import { IconPlusCircle, IconMinusCircle, IconWrench, IconReceipt, IconFileText } from './icons.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import EmptyState from './EmptyState.jsx';
 
@@ -21,6 +21,18 @@ export default function MovementHistory() {
   const { handleUnauthorized } = useAuth();
   const { notify } = useToast();
   const { lastEvent } = useLiveUpdates();
+  const [generatingId, setGeneratingId] = useState(null);
+
+  async function handleViewInvoice(movementId) {
+    setGeneratingId(movementId);
+    try {
+      await api.viewInvoice(movementId);
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setGeneratingId(null);
+    }
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -62,6 +74,7 @@ export default function MovementHistory() {
                 <th className="px-4 py-3">Cantidad</th>
                 <th className="px-4 py-3">Stock resultante</th>
                 <th className="px-4 py-3">Nota</th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -77,7 +90,7 @@ export default function MovementHistory() {
                       className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60"
                     >
                       <td className="whitespace-nowrap px-4 py-3 text-slate-500">
-                        {new Date(m.createdAt.replace(' ', 'T') + 'Z').toLocaleString('es')}
+                        {new Date(m.createdAt).toLocaleString('es')}
                       </td>
                       <td className="px-4 py-3 font-medium text-slate-800">{m.productName}</td>
                       <td className="px-4 py-3">
@@ -91,6 +104,18 @@ export default function MovementHistory() {
                       <td className="px-4 py-3 text-slate-700">{m.quantity}</td>
                       <td className="px-4 py-3 text-slate-700">{m.stockAfter}</td>
                       <td className="px-4 py-3 text-slate-500">{m.note || '—'}</td>
+                      <td className="px-4 py-3 text-right">
+                        {m.type === 'salida' && (
+                          <button
+                            onClick={() => handleViewInvoice(m.id)}
+                            disabled={generatingId === m.id}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 underline hover:text-slate-800"
+                          >
+                            <IconFileText className="h-3.5 w-3.5" />
+                            {generatingId === m.id ? 'Generando…' : 'Ver recibo'}
+                          </button>
+                        )}
+                      </td>
                     </motion.tr>
                   );
                 })}

@@ -31,7 +31,7 @@ export default function Sidebar({ views, active, onNavigate }) {
           <IconStore className="h-5 w-5" />
         </div>
         <span className="hidden text-sm font-semibold tracking-tight text-white sm:block">
-          Panel de la Tienda
+          Mostrador
         </span>
       </div>
 

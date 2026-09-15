@@ -3,11 +3,11 @@ import express from 'express';
 import cors from 'cors';
 import path from 'node:path';
 import fs from 'node:fs';
-import https from 'node:https';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { ensurePinConfigured, requireAuth } from './auth.js';
-import { getOrCreateHttpsCert } from './https-cert.js';
+import { requireAuth } from './auth.js';
+import { ready } from './db.js';
 import { authRouter } from './routes/auth.js';
+import { billingRouter } from './routes/billing.js';
 import { productsRouter } from './routes/products.js';
 import { movementsRouter } from './routes/movements.js';
 import { statsRouter } from './routes/stats.js';
@@ -15,36 +15,49 @@ import { cashRouter } from './routes/cash.js';
 import { reportsRouter } from './routes/reports.js';
 import { settingsRouter } from './routes/settings.js';
 import { eventsRouter } from './routes/events.js';
+import { requireActiveSubscription } from './billing.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Cuando el cliente ya está compilado (npm run build, o empaquetado en la app
-// de escritorio), lo servimos desde este mismo servidor en el mismo origen,
-// así no hace falta CORS ni un segundo proceso para usar el programa. La ruta
-// es relativa a este archivo, así que funciona igual corriendo desde el
-// repositorio o desde la copia que arma la app de escritorio.
+// Cuando el cliente ya está compilado (npm run build, o el modo producción
+// desplegado), lo servimos desde este mismo servidor en el mismo origen, así
+// no hace falta CORS ni un segundo proceso para usar el programa.
 const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');
 const hasClientBuild = fs.existsSync(path.join(clientDist, 'index.html'));
 
 export function createApp() {
-  ensurePinConfigured(process.env.ADMIN_PIN || '1234');
-
   const app = express();
   const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
   if (!hasClientBuild) app.use(cors({ origin: clientOrigin }));
-  app.use(express.json());
+
+  // El webhook de Flow necesita el cuerpo crudo (sin parsear) para poder
+  // verificar la firma, así que se monta antes que express.json().
+  app.use('/api/billing/webhook', express.raw({ type: '*/*', limit: '1mb' }));
+  app.use(express.json({ limit: '20mb' }));
+
+  // Espera a que las migraciones terminen antes de atender cualquier pedido.
+  app.use(async (req, res, next) => {
+    try {
+      await ready();
+      next();
+    } catch (err) {
+      console.error('Error al preparar la base de datos:', err);
+      res.status(503).json({ error: 'El servidor no está listo, intenta de nuevo en un momento' });
+    }
+  });
 
   app.get('/api/health', (req, res) => res.json({ ok: true }));
 
   app.use('/api/auth', authRouter);
+  app.use('/api/billing', billingRouter);
   // Sin requireAuth: EventSource no puede mandar el header Authorization,
   // así que el token se valida a mano dentro de este router (por query param).
   app.use('/api/events', eventsRouter);
-  app.use('/api/products', requireAuth, productsRouter);
-  app.use('/api/movements', requireAuth, movementsRouter);
-  app.use('/api/stats', requireAuth, statsRouter);
-  app.use('/api/cash', requireAuth, cashRouter);
-  app.use('/api/reports', requireAuth, reportsRouter);
-  app.use('/api/settings', requireAuth, settingsRouter);
+  app.use('/api/products', requireAuth, requireActiveSubscription, productsRouter);
+  app.use('/api/movements', requireAuth, requireActiveSubscription, movementsRouter);
+  app.use('/api/stats', requireAuth, requireActiveSubscription, statsRouter);
+  app.use('/api/cash', requireAuth, requireActiveSubscription, cashRouter);
+  app.use('/api/reports', requireAuth, requireActiveSubscription, reportsRouter);
+  app.use('/api/settings', requireAuth, requireActiveSubscription, settingsRouter);
 
   if (hasClientBuild) {
     app.use(express.static(clientDist));
@@ -60,37 +73,26 @@ export function createApp() {
   return app;
 }
 
-// port: 0 deja que el sistema operativo elija un puerto libre (lo usa la app
-// de escritorio, para no chocar con otro programa). Resuelve con el puerto
-// real en el que quedó escuchando.
-//
-// HTTPS: los navegadores solo dan acceso a la cámara (para escanear códigos
-// de barras) en conexiones seguras, y eso incluye abrir el panel desde el
-// teléfono por la IP de la red local (no solo "localhost"). Por eso, cuando
-// el cliente ya está compilado (el caso real de uso: la app empaquetada o
-// "npm run build" en producción), el servidor usa un certificado autofirmado
-// propio en vez de HTTP simple.
+// port: 0 deja que el sistema operativo elija un puerto libre. Resuelve con
+// el puerto real en el que quedó escuchando.
 export async function startServer(options = {}) {
   const app = createApp();
+  await ready();
   const requestedPort = options.port ?? (process.env.PORT ? Number(process.env.PORT) : 4000);
-  const useHttps = options.https ?? (process.env.HTTPS === 'false' ? false : hasClientBuild);
-  const server = useHttps ? https.createServer(await getOrCreateHttpsCert(), app) : app;
 
   return new Promise((resolve, reject) => {
-    const listening = server.listen(requestedPort);
+    const listening = app.listen(requestedPort);
     listening.once('listening', () => {
       const port = listening.address().port;
-      const protocol = useHttps ? 'https' : 'http';
-      console.log(`Tienda Admin API escuchando en ${protocol}://localhost:${port}`);
-      resolve({ server: listening, port, protocol });
+      console.log(`Mostrador API escuchando en http://localhost:${port}`);
+      resolve({ server: listening, port, protocol: 'http' });
     });
     listening.once('error', reject);
   });
 }
 
 // Arranca solo si el archivo se ejecuta directamente (`node src/index.js`),
-// no cuando otro módulo (como la app de escritorio) lo importa para controlar
-// el arranque él mismo.
+// no cuando otro módulo lo importa para controlar el arranque él mismo.
 const isMainModule = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMainModule) {
   startServer();

@@ -1,96 +1,97 @@
-# Panel de la Tienda (Tienda Admin)
+# Mostrador
 
-Programa privado de escritorio/local para que el dueño de una tienda administre
-su catálogo de productos y lleve control de todo lo que entra y sale del
-inventario (ventas, uso, reposiciones y ajustes). No es un sitio público: está
-pensado para correr en la computadora de la tienda y solo se accede con un PIN.
+Mostrador es un panel en línea (SaaS) para que el dueño de una tienda
+administre su catálogo de productos, controle todo lo que entra y sale del
+inventario, lleve el control de caja, genere recibos de venta en PDF y
+reciba un análisis mensual de su negocio con IA — todo desde el navegador,
+en cualquier computadora o teléfono, sin instalar nada.
+
+Cada negocio que se registra tiene sus propios datos, completamente
+separados de los demás (multi-tenant): nadie ve ni puede tocar la
+información de otra tienda. El acceso requiere una suscripción mensual de
+**$20.000 CLP**, cobrada con [Flow](https://flow.cl).
 
 ## ¿Qué incluye?
 
+- **Cuenta propia por negocio**: registro con nombre del negocio, correo y
+  contraseña; sesión con JWT.
+- **Suscripción de pago**: $20.000 CLP/mes vía Flow. Sin pago al día, el
+  panel se bloquea (los datos nunca se borran).
 - **Panel general**: valor del inventario, productos con stock bajo y los
   productos más usados/vendidos.
 - **Productos**: alta, edición y baja de productos (nombre, SKU, categoría,
   precio, costo, stock mínimo, unidad).
 - **Movimientos de stock**: registra entradas (compras/reposición), salidas
   (uso/venta) y ajustes manuales; el stock del producto se actualiza solo.
-- **Historial**: bitácora completa de todos los movimientos con fecha, tipo,
-  cantidad y nota.
-- **Reportes mensuales**: por cada mes muestra las ganancias (calculadas con
-  el precio/costo vigente al momento de cada venta), el gasto en reposición,
-  qué productos hay que reponer y las alertas críticas de inventario.
-- **Control de caja**: registra aparte cuánto dinero realmente ingresó y
-  cuánto falta, para contrastarlo contra las ventas que calcula el sistema y
-  detectar diferencias.
-- **Análisis con IA**: un botón en Reportes genera (con la API de Claude) un
-  resumen en español del mes — ganancias, qué reponer con urgencia, alertas
-  críticas y si el efectivo registrado coincide con las ventas — y lo guarda
-  para no tener que regenerarlo cada vez que abres la página.
-- **Acceso con PIN**: pantalla de bloqueo antes de entrar al panel, con
-  posibilidad de cambiar el PIN desde Ajustes.
-- **Todo conectado en tiempo real**: la computadora del dueño, la de la caja
-  y el teléfono pueden estar abiertos al mismo tiempo (todos apuntando a la
-  misma computadora, la que corre el programa). Cuando cualquiera registra
-  un movimiento, agrega un producto o anota un ingreso/faltante de caja, las
-  demás pantallas lo ven aparecer solas — con un aviso de qué pasó y dónde —
-  sin recargar la página. El indicador "En vivo" de la barra lateral confirma
-  que la conexión está activa.
-- **Lector de código de barras**: en Productos, escanear el código de un
-  producto (usando su SKU) abre directo el modal de "Registrar movimiento" —
-  no hace falta buscarlo a mano. Funciona con cualquier lector USB/Bluetooth
-  común (se comporta como un teclado), o con la **cámara del teléfono**: desde
-  Ajustes se puede abrir el panel en el navegador del teléfono (misma red
-  Wi-Fi) y usar el botón "Escanear con cámara" para lo mismo, caminando por
-  la tienda sin depender de la computadora.
-- **Respaldo y exportación** (en Ajustes): descarga una copia completa de la
-  base de datos, restaura un respaldo anterior, o exporta productos,
-  movimientos y caja a CSV para revisarlos en Excel. La app de escritorio
-  además guarda respaldos automáticos cada 6 horas (conserva los últimos 14).
-- **Actualizaciones automáticas** (app de escritorio): revisa sola si hay una
-  versión nueva publicada y ofrece instalarla, sin que el dueño tenga que
-  descargar nada manualmente.
-- **App de escritorio**: se puede empaquetar como programa instalable de
-  Windows/Mac/Linux (doble clic para abrir, sin terminal ni Node.js instalado).
-- Interfaz visual con animaciones (React + Tailwind + Framer Motion).
+- **Recibos en PDF**: cada venta puede generar un recibo simple en PDF
+  (nombre del negocio, producto, cantidad, precio, total) desde el
+  Historial. No reemplaza una boleta/factura electrónica formal ante el SII.
+- **Reportes mensuales**: ganancias, gasto en reposición, qué reponer con
+  urgencia, alertas críticas de inventario, y análisis con IA (API de
+  Claude) que resume todo eso en español.
+- **Control de caja**: registra cuánto dinero realmente ingresó y cuánto
+  falta, para contrastarlo contra las ventas que calcula el sistema.
+- **Todo conectado en tiempo real**: la computadora del dueño, la de la
+  caja y el teléfono pueden estar abiertos al mismo tiempo. Cuando
+  cualquiera registra un movimiento, las demás pantallas lo ven aparecer
+  solo, sin recargar.
+- **Lector de código de barras**: por teclado (lector USB/Bluetooth común)
+  o con la cámara del teléfono, abriendo el mismo panel desde ahí.
+- **Respaldo y exportación**: descarga un respaldo en JSON de los datos del
+  negocio, restáuralo, o exporta productos/movimientos/caja a CSV.
 
 ## Estructura del proyecto
 
 ```
 tienda-admin/
-  server/   API en Node.js + Express + SQLite (better-sqlite3)
+  server/   API en Node.js + Express + PostgreSQL
   client/   Interfaz en React + Vite + Tailwind + Framer Motion
-  desktop/  Empaquetado como programa de escritorio (Electron)
+  desktop/  Empaquetado como programa de escritorio (Electron) — ver nota abajo
 ```
+
+> **Sobre `desktop/`**: antes de convertirse en un producto en línea
+> multi-negocio, este proyecto era una herramienta privada de escritorio con
+> SQLite local. Ese empaquetado de Electron queda en el repositorio tal
+> cual, pero **ya no funciona** contra el backend actual (que requiere
+> PostgreSQL y cuentas multi-negocio) — quedó fuera del alcance de este
+> pivote. Se puede retomar más adelante como un empaquetado liviano que solo
+> abra la URL real del sitio ya desplegado, si hace falta.
 
 ## Requisitos
 
 - Node.js 18 o superior
+- PostgreSQL 14 o superior (local para desarrollo, o el que dé tu hosting)
 
-## Cómo correr el programa localmente
+## Cómo correr el proyecto localmente
 
-### 1. Backend (API)
+### 1. Base de datos
+
+Crea una base Postgres local vacía (ejemplo con la CLI de `psql`):
+
+```bash
+createdb tienda_admin_dev
+```
+
+### 2. Backend (API)
 
 ```bash
 cd tienda-admin/server
-cp .env.example .env   # ajusta ADMIN_PIN con el PIN que quieras usar
+cp .env.example .env   # ajusta DATABASE_URL, JWT_SECRET, etc.
 npm install
 npm start               # o "npm run dev" para reinicio automático
 ```
 
-La API queda escuchando en `http://localhost:4000`. La base de datos SQLite se
-crea automáticamente en `server/data/tienda.db` la primera vez que arranca.
+La API queda escuchando en `http://localhost:4000` y aplica sola las
+migraciones (`server/migrations/*.sql`) contra la base indicada en
+`DATABASE_URL` la primera vez que arranca.
 
-Para habilitar el botón **"Generar análisis"** de la sección Reportes, agrega
-tu API key de Anthropic en `server/.env`:
+Sin `FLOW_API_KEY` configurada, y con `NODE_ENV` distinto de `production`,
+el botón "Pagar y activar" activa la suscripción directo (modo desarrollo)
+para poder probar todo el panel sin necesitar una cuenta de Flow todavía.
+Ver `.env.example` para el resto de las variables (incluida la API key de
+Anthropic para el análisis con IA, opcional).
 
-```
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-Consíguela en <https://console.anthropic.com/>. Si la dejas vacía, el resto
-del panel (productos, movimientos, reportes, caja) funciona igual; solo el
-botón de análisis con IA mostrará un aviso pidiendo configurarla.
-
-### 2. Frontend (panel)
+### 3. Frontend (panel)
 
 En otra terminal:
 
@@ -100,122 +101,30 @@ npm install
 npm run dev
 ```
 
-Abre `http://localhost:5173` en el navegador e ingresa el PIN configurado en
-`server/.env` (por defecto `1234`, cámbialo antes de usarlo en la tienda real).
+Abre `http://localhost:5173`, crea una cuenta y activa la suscripción
+(modo desarrollo si no configuraste Flow todavía).
 
-### Uso en producción / todos los días
-
-Para dejarlo corriendo como un programa de la tienda:
+### Build de producción local
 
 ```bash
 cd tienda-admin/client && npm run build   # genera client/dist
-cd ../server && npm start                 # deja la API corriendo
+cd ../server && npm start                 # sirve la API + el cliente compilado
 ```
 
-Sirve los archivos de `client/dist` con cualquier servidor estático (o ábrelos
-detrás de la misma API) y dale al dueño de la tienda solo el acceso a esa
-máquina o red local — el panel no debe exponerse a internet público.
+## Desplegar en internet
 
-Con `client/dist` ya compilado, el servidor arranca automáticamente por
-**HTTPS** (con un certificado propio autofirmado, generado una sola vez y
-guardado en `server/data/`) en vez de HTTP simple. Esto es necesario para que
-el navegador del teléfono dé acceso a la cámara al escanear códigos de barras
-(los navegadores solo lo permiten en conexiones seguras, y eso incluye abrir
-el panel por la IP de la red local, no solo "localhost"). Para forzar HTTP
-en ese modo (por ejemplo, mientras depuras) usa `HTTPS=false npm start`.
-
-### Usar el panel desde el teléfono o desde otra computadora (por ejemplo, la caja)
-
-La computadora que corre el programa (con la app de escritorio, o con
-`npm start` en modo producción) es la única que tiene la base de datos. Cualquier
-otro dispositivo en la misma red Wi-Fi/Ethernet — el teléfono, o una segunda
-computadora en la caja registradora — puede abrir el panel apuntando a esa
-computadora, y verá los mismos datos en tiempo real.
-
-1. Abre **Ajustes** en la computadora principal → sección "Usar desde tu
-   teléfono". Ahí sale la dirección (`https://IP-de-esa-computadora:puerto`)
-   y un código QR.
-2. Desde el otro dispositivo, escanea el QR con la cámara (o escribe la
-   dirección a mano en el navegador), estando en la misma red.
-3. La primera vez el navegador va a mostrar una advertencia de seguridad
-   ("conexión no privada"): es porque el certificado es propio de esa
-   computadora, no de una entidad pública reconocida. Toca "Avanzado" y
-   "Continuar de todas formas" — solo hace falta una vez por dispositivo.
-4. Entra con el mismo PIN. Desde ahí ya se puede usar "Escanear con cámara"
-   en Productos, y cualquier movimiento, producto o registro de caja que se
-   haga en cualquiera de las pantallas conectadas aparece solo en las demás
-   (ver "Todo conectado en tiempo real" más arriba).
-
-## Entregarlo como programa de escritorio (recomendado)
-
-Esta es la forma más simple de dárselo al dueño de la tienda: un instalador
-que abre con doble clic, sin instalar Node.js ni usar la terminal. Por dentro
-sigue siendo el mismo backend (Express + SQLite) corriendo dentro de la app
-de Electron, con su base de datos guardada en la carpeta de datos del sistema
-operativo (sobrevive si reinstalas o actualizas el programa).
-
-### Opción A: generar el instalador con GitHub Actions (no necesitas Windows ni Mac)
-
-El repositorio incluye el workflow `.github/workflows/tienda-admin-desktop-build.yml`,
-que compila el instalador para Windows, Mac y Linux en máquinas de GitHub:
-
-1. En GitHub, ve a la pestaña **Actions** del repositorio.
-2. Abre **"Empaquetar Panel de la Tienda (escritorio)"** y presiona **Run workflow**
-   (o simplemente haz push a la rama — el workflow también corre solo cuando
-   cambia algo dentro de `tienda-admin/`).
-3. Cuando termine (unos minutos), entra a esa ejecución y descarga el artefacto
-   que necesites: `panel-tienda-windows-installer` (`.exe`), `panel-tienda-mac-installer`
-   (`.dmg`) o `panel-tienda-linux-installer` (`.AppImage`).
-4. Manda ese archivo al dueño de la tienda (USB, correo, Drive, WhatsApp…) y
-   que lo abra como cualquier instalador.
-
-### Opción B: generarlo tú mismo en tu computadora
-
-```bash
-cd tienda-admin/desktop
-npm install                # instala Electron y recompila better-sqlite3 para su motor
-npm run dist:win           # o dist:mac / dist:linux, según en qué SO lo corras
-```
-
-El instalador queda en `tienda-admin/desktop/release/`. Los instaladores de
-Windows y Mac solo se pueden generar corriendo el comando en esa misma
-plataforma (o usando la Opción A), por eso conviene el workflow de GitHub
-Actions si tú trabajas en otro sistema operativo.
-
-### Primer uso por el dueño de la tienda
-
-Al abrir el programa por primera vez, el PIN por defecto es `1234` — pídele
-que lo cambie de inmediato desde **Ajustes**. Si quiere el análisis con IA,
-también puede pegar ahí su propia API key de Anthropic (no requiere editar
-ningún archivo).
-
-### Publicar una actualización (para que las apps ya instaladas se actualicen solas)
-
-La app de escritorio revisa sola si hay una versión nueva (ver
-`desktop/main.cjs`, `setupAutoUpdater`). Para publicar una:
-
-1. Sube el número de versión en `tienda-admin/desktop/package.json`.
-2. Haz commit de ese cambio.
-3. Crea y empuja un tag con el formato `tienda-admin-vX.Y.Z`, por ejemplo:
-
-   ```bash
-   git tag tienda-admin-v1.1.0
-   git push origin tienda-admin-v1.1.0
-   ```
-
-4. El workflow `.github/workflows/tienda-admin-desktop-release.yml` compila
-   los instaladores de Windows/Mac/Linux y los publica como GitHub Release.
-   Los programas ya instalados la detectan sola (revisan cada 6 horas y al
-   abrir) y ofrecen instalarla.
-
-Ese tag solo dispara este workflow — no interfiere con el resto del
-contenido del repositorio ni con el workflow de compilación normal.
+Ver [`DEPLOY.md`](./DEPLOY.md) para la guía paso a paso (Render.com,
+incluye Dockerfile listo para usar).
 
 ## Seguridad
 
-- El PIN se guarda con hash (scrypt) en la base de datos, nunca en texto plano.
-- Todas las rutas de productos, movimientos y estadísticas requieren una
-  sesión válida obtenida con el PIN.
-- Cambia el PIN por defecto (`1234`) antes de usar la app con datos reales,
-  desde `server/.env` (primer arranque) o desde la sección **Ajustes** del
-  panel.
+- Las contraseñas se guardan con hash (scrypt), nunca en texto plano.
+- Las sesiones son JWT firmados con `JWT_SECRET` — cámbialo por un valor
+  propio y secreto antes de usar la app con datos reales.
+- Todos los datos de negocio (productos, movimientos, caja, reportes,
+  eventos en tiempo real) están aislados por `business_id`: ninguna consulta
+  cruza esa frontera.
+- El pago de la suscripción nunca pasa por este servidor: Flow redirige al
+  dueño a su propia página para ingresar la tarjeta, y solo nos avisa el
+  resultado (verificado contra la API de Flow, no confiando ciegamente en
+  el aviso).

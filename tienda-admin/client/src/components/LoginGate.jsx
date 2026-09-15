@@ -4,9 +4,12 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useShake } from '../hooks/useShake.js';
 import { IconLock } from './icons.jsx';
 
-export default function LoginGate() {
-  const { login } = useAuth();
-  const [pin, setPin] = useState('');
+export default function LoginGate({ initialMode = 'login', onBack }) {
+  const { login, signup } = useAuth();
+  const [mode, setMode] = useState(initialMode); // 'login' | 'signup'
+  const [businessName, setBusinessName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [shakeControls, shake] = useShake();
@@ -16,14 +19,19 @@ export default function LoginGate() {
     setError('');
     setLoading(true);
     try {
-      await login(pin);
+      if (mode === 'signup') await signup(businessName, email, password);
+      else await login(email, password);
     } catch (err) {
       setError(err.message);
-      setPin('');
       shake();
     } finally {
       setLoading(false);
     }
+  }
+
+  function switchMode(nextMode) {
+    setMode(nextMode);
+    setError('');
   }
 
   return (
@@ -43,20 +51,70 @@ export default function LoginGate() {
         >
           <IconLock className="h-6 w-6" />
         </motion.div>
-        <h1 className="mb-6 text-center text-xl font-semibold text-slate-800">
-          Panel de la Tienda
-        </h1>
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="mb-3 text-xs font-medium text-slate-400 hover:text-slate-600"
+          >
+            ← Volver
+          </button>
+        )}
+        <h1 className="mb-1 text-center text-xl font-semibold text-slate-800">Mostrador</h1>
+        <p className="mb-6 text-center text-xs text-slate-500">
+          {mode === 'login' ? 'Ingresa a tu panel' : 'Crea la cuenta de tu negocio'}
+        </p>
 
-        <motion.div animate={shakeControls}>
+        <div className="mb-5 flex rounded-xl bg-slate-100 p-1 text-sm font-medium">
+          <button
+            type="button"
+            onClick={() => switchMode('login')}
+            className={`flex-1 rounded-lg py-1.5 transition ${
+              mode === 'login' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'
+            }`}
+          >
+            Iniciar sesión
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode('signup')}
+            className={`flex-1 rounded-lg py-1.5 transition ${
+              mode === 'signup' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'
+            }`}
+          >
+            Crear cuenta
+          </button>
+        </div>
+
+        <motion.div animate={shakeControls} className="space-y-3">
+          {mode === 'signup' && (
+            <input
+              autoFocus
+              type="text"
+              required
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+              placeholder="Nombre de tu negocio"
+              className="input"
+            />
+          )}
           <input
-            autoFocus
+            autoFocus={mode === 'login'}
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Correo electrónico"
+            className="input"
+          />
+          <input
             type="password"
-            inputMode="numeric"
-            maxLength={16}
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            placeholder="••••"
-            className="input mb-3 text-center text-lg tracking-[0.5em]"
+            required
+            minLength={8}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Contraseña"
+            className="input"
           />
         </motion.div>
 
@@ -64,15 +122,21 @@ export default function LoginGate() {
           <motion.p
             initial={{ opacity: 0, x: -6 }}
             animate={{ opacity: 1, x: 0 }}
-            className="mb-3 text-center text-sm text-rose-600"
+            className="mt-3 text-center text-sm text-rose-600"
           >
             {error}
           </motion.p>
         )}
 
-        <button type="submit" disabled={loading || !pin} className="btn-primary w-full">
-          {loading ? 'Verificando…' : 'Entrar'}
+        <button type="submit" disabled={loading} className="btn-primary mt-4 w-full">
+          {loading ? 'Un momento…' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}
         </button>
+
+        {mode === 'signup' && (
+          <p className="mt-3 text-center text-xs text-slate-400">
+            Después de crear la cuenta te pedimos activar la suscripción mensual.
+          </p>
+        )}
       </motion.form>
     </div>
   );

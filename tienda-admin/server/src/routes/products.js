@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { db } from '../db.js';
+import { pool } from '../db.js';
 import { toCsv, sendCsv } from '../csv.js';
 import { broadcast } from '../events.js';
 
@@ -24,68 +24,81 @@ function serializeProduct(row) {
   };
 }
 
-productsRouter.get('/', (req, res) => {
+const PRODUCT_EXPORT_COLUMNS = [
+  { label: 'Nombre', value: (r) => r.name },
+  { label: 'SKU', value: (r) => r.sku },
+  { label: 'Categoría', value: (r) => r.category },
+  { label: 'Precio', value: (r) => r.price },
+  { label: 'Costo', value: (r) => r.cost },
+  { label: 'Stock', value: (r) => r.stock },
+  { label: 'Stock mínimo', value: (r) => r.min_stock },
+  { label: 'Unidad', value: (r) => r.unit },
+  { label: 'Descripción', value: (r) => r.description },
+];
+
+productsRouter.get('/', async (req, res) => {
   const { search, category } = req.query;
-  let query = 'SELECT * FROM products';
-  const clauses = [];
-  const params = [];
+  const clauses = ['business_id = $1'];
+  const params = [req.businessId];
 
   if (search) {
-    clauses.push('(name LIKE ? OR sku LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`);
+    const term = `%${search}%`;
+    params.push(term, term);
+    clauses.push(`(name ILIKE $${params.length - 1} OR sku ILIKE $${params.length})`);
   }
   if (category) {
-    clauses.push('category = ?');
     params.push(category);
+    clauses.push(`category = $${params.length}`);
   }
-  if (clauses.length) query += ' WHERE ' + clauses.join(' AND ');
-  query += ' ORDER BY name ASC';
 
-  const rows = db.prepare(query).all(...params);
+  const { rows } = await pool.query(
+    `SELECT * FROM products WHERE ${clauses.join(' AND ')} ORDER BY name ASC`,
+    params
+  );
   res.json(rows.map(serializeProduct));
 });
 
-productsRouter.get('/categories', (req, res) => {
-  const rows = db
-    .prepare('SELECT DISTINCT category FROM products ORDER BY category ASC')
-    .all();
+productsRouter.get('/categories', async (req, res) => {
+  const { rows } = await pool.query(
+    'SELECT DISTINCT category FROM products WHERE business_id = $1 ORDER BY category ASC',
+    [req.businessId]
+  );
   res.json(rows.map((r) => r.category));
 });
 
 // Búsqueda exacta por SKU: la usa el lector de código de barras, que escanea
 // el código completo de una vez (a diferencia de la búsqueda por texto, que
-// es parcial con LIKE).
-productsRouter.get('/lookup', (req, res) => {
+// es parcial).
+productsRouter.get('/lookup', async (req, res) => {
   const code = String(req.query.code || '').trim();
   if (!code) return res.status(400).json({ error: 'Falta el código' });
-  const row = db.prepare('SELECT * FROM products WHERE sku = ? COLLATE NOCASE').get(code);
-  if (!row) return res.status(404).json({ error: 'Ningún producto tiene ese código' });
-  res.json(serializeProduct(row));
+
+  const { rows } = await pool.query(
+    'SELECT * FROM products WHERE business_id = $1 AND LOWER(sku) = LOWER($2)',
+    [req.businessId, code]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Ningún producto tiene ese código' });
+  res.json(serializeProduct(rows[0]));
 });
 
-productsRouter.get('/export.csv', (req, res) => {
-  const rows = db.prepare('SELECT * FROM products ORDER BY name ASC').all();
-  const csv = toCsv(rows, [
-    { label: 'Nombre', value: (r) => r.name },
-    { label: 'SKU', value: (r) => r.sku },
-    { label: 'Categoría', value: (r) => r.category },
-    { label: 'Precio', value: (r) => r.price },
-    { label: 'Costo', value: (r) => r.cost },
-    { label: 'Stock', value: (r) => r.stock },
-    { label: 'Stock mínimo', value: (r) => r.min_stock },
-    { label: 'Unidad', value: (r) => r.unit },
-    { label: 'Descripción', value: (r) => r.description },
+productsRouter.get('/export.csv', async (req, res) => {
+  const { rows } = await pool.query(
+    'SELECT * FROM products WHERE business_id = $1 ORDER BY name ASC',
+    [req.businessId]
+  );
+  sendCsv(res, 'productos.csv', toCsv(rows, PRODUCT_EXPORT_COLUMNS));
+});
+
+productsRouter.get('/:id', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM products WHERE business_id = $1 AND id = $2', [
+    req.businessId,
+    req.params.id,
   ]);
-  sendCsv(res, 'productos.csv', csv);
+  if (!rows[0]) return res.status(404).json({ error: 'Producto no encontrado' });
+  res.json(serializeProduct(rows[0]));
 });
 
-productsRouter.get('/:id', (req, res) => {
-  const row = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
-  if (!row) return res.status(404).json({ error: 'Producto no encontrado' });
-  res.json(serializeProduct(row));
-});
-
-productsRouter.post('/', (req, res) => {
+productsRouter.post('/', async (req, res) => {
   const { name, sku, category, price, cost, stock, minStock, unit, description, imageUrl } =
     req.body ?? {};
 
@@ -94,12 +107,13 @@ productsRouter.post('/', (req, res) => {
   }
 
   try {
-    const result = db
-      .prepare(
-        `INSERT INTO products (name, sku, category, price, cost, stock, min_stock, unit, description, image_url)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(
+    const { rows } = await pool.query(
+      `INSERT INTO products
+        (business_id, name, sku, category, price, cost, stock, min_stock, unit, description, image_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING *`,
+      [
+        req.businessId,
         name.trim(),
         sku || null,
         category || 'General',
@@ -109,67 +123,83 @@ productsRouter.post('/', (req, res) => {
         Number(minStock) || 0,
         unit || 'unidad',
         description || null,
-        imageUrl || null
-      );
+        imageUrl || null,
+      ]
+    );
 
-    const row = db.prepare('SELECT * FROM products WHERE id = ?').get(result.lastInsertRowid);
-    const product = serializeProduct(row);
-    broadcast('product', { action: 'created', name: product.name }, req.headers['x-client-id']);
+    const product = serializeProduct(rows[0]);
+    broadcast(
+      'product',
+      { action: 'created', name: product.name },
+      req.headers['x-client-id'],
+      req.businessId
+    );
     res.status(201).json(product);
   } catch (err) {
-    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    if (err.code === '23505') {
       return res.status(409).json({ error: 'Ya existe un producto con ese SKU' });
     }
     throw err;
   }
 });
 
-productsRouter.put('/:id', (req, res) => {
-  const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
+productsRouter.put('/:id', async (req, res) => {
+  const { rows: existingRows } = await pool.query(
+    'SELECT * FROM products WHERE business_id = $1 AND id = $2',
+    [req.businessId, req.params.id]
+  );
+  const existing = existingRows[0];
   if (!existing) return res.status(404).json({ error: 'Producto no encontrado' });
 
   const { name, sku, category, price, cost, stock, minStock, unit, description, imageUrl } =
     req.body ?? {};
 
   try {
-    db.prepare(
+    const { rows } = await pool.query(
       `UPDATE products SET
-        name = ?, sku = ?, category = ?, price = ?, cost = ?,
-        stock = ?, min_stock = ?, unit = ?, description = ?, image_url = ?,
-        updated_at = datetime('now')
-       WHERE id = ?`
-    ).run(
-      name?.trim() || existing.name,
-      sku ?? existing.sku,
-      category ?? existing.category,
-      price !== undefined ? Number(price) : existing.price,
-      cost !== undefined ? Number(cost) : existing.cost,
-      stock !== undefined ? Number(stock) : existing.stock,
-      minStock !== undefined ? Number(minStock) : existing.min_stock,
-      unit ?? existing.unit,
-      description ?? existing.description,
-      imageUrl ?? existing.image_url,
-      req.params.id
+        name = $1, sku = $2, category = $3, price = $4, cost = $5,
+        stock = $6, min_stock = $7, unit = $8, description = $9, image_url = $10,
+        updated_at = now()
+       WHERE business_id = $11 AND id = $12
+       RETURNING *`,
+      [
+        name?.trim() || existing.name,
+        sku ?? existing.sku,
+        category ?? existing.category,
+        price !== undefined ? Number(price) : existing.price,
+        cost !== undefined ? Number(cost) : existing.cost,
+        stock !== undefined ? Number(stock) : existing.stock,
+        minStock !== undefined ? Number(minStock) : existing.min_stock,
+        unit ?? existing.unit,
+        description ?? existing.description,
+        imageUrl ?? existing.image_url,
+        req.businessId,
+        req.params.id,
+      ]
     );
 
-    const row = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
-    const product = serializeProduct(row);
-    broadcast('product', { action: 'updated', name: product.name }, req.headers['x-client-id']);
+    const product = serializeProduct(rows[0]);
+    broadcast(
+      'product',
+      { action: 'updated', name: product.name },
+      req.headers['x-client-id'],
+      req.businessId
+    );
     res.json(product);
   } catch (err) {
-    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    if (err.code === '23505') {
       return res.status(409).json({ error: 'Ya existe un producto con ese SKU' });
     }
     throw err;
   }
 });
 
-productsRouter.delete('/:id', (req, res) => {
-  const existing = db.prepare('SELECT name FROM products WHERE id = ?').get(req.params.id);
-  const result = db.prepare('DELETE FROM products WHERE id = ?').run(req.params.id);
-  if (result.changes === 0) {
-    return res.status(404).json({ error: 'Producto no encontrado' });
-  }
-  broadcast('product', { action: 'deleted', name: existing?.name }, req.headers['x-client-id']);
+productsRouter.delete('/:id', async (req, res) => {
+  const { rows } = await pool.query(
+    'DELETE FROM products WHERE business_id = $1 AND id = $2 RETURNING name',
+    [req.businessId, req.params.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Producto no encontrado' });
+  broadcast('product', { action: 'deleted', name: rows[0].name }, req.headers['x-client-id'], req.businessId);
   res.json({ ok: true });
 });

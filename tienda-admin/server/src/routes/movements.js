@@ -1,9 +1,14 @@
 import { Router } from 'express';
-import { db } from '../db.js';
+import PDFDocument from 'pdfkit';
+import { pool } from '../db.js';
 import { toCsv, sendCsv } from '../csv.js';
 import { broadcast } from '../events.js';
 
 export const movementsRouter = Router();
+
+function formatClp(n) {
+  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(n || 0);
+}
 
 function serializeMovement(row) {
   return {
@@ -24,32 +29,32 @@ const MOVEMENTS_QUERY = `
   JOIN products ON products.id = movements.product_id
 `;
 
-movementsRouter.get('/', (req, res) => {
+movementsRouter.get('/', async (req, res) => {
   const { productId, type, limit } = req.query;
-  let query = MOVEMENTS_QUERY;
-  const clauses = [];
-  const params = [];
+  const clauses = ['movements.business_id = $1'];
+  const params = [req.businessId];
 
   if (productId) {
-    clauses.push('movements.product_id = ?');
     params.push(productId);
+    clauses.push(`movements.product_id = $${params.length}`);
   }
   if (type) {
-    clauses.push('movements.type = ?');
     params.push(type);
+    clauses.push(`movements.type = $${params.length}`);
   }
-  if (clauses.length) query += ' WHERE ' + clauses.join(' AND ');
-  query += ' ORDER BY movements.created_at DESC, movements.id DESC';
+
+  let query = `${MOVEMENTS_QUERY} WHERE ${clauses.join(' AND ')} ORDER BY movements.created_at DESC, movements.id DESC`;
   if (limit) query += ` LIMIT ${Math.min(Number(limit) || 50, 500)}`;
 
-  const rows = db.prepare(query).all(...params);
+  const { rows } = await pool.query(query, params);
   res.json(rows.map(serializeMovement));
 });
 
-movementsRouter.get('/export.csv', (req, res) => {
-  const rows = db
-    .prepare(MOVEMENTS_QUERY + ' ORDER BY movements.created_at DESC, movements.id DESC')
-    .all();
+movementsRouter.get('/export.csv', async (req, res) => {
+  const { rows } = await pool.query(
+    `${MOVEMENTS_QUERY} WHERE movements.business_id = $1 ORDER BY movements.created_at DESC, movements.id DESC`,
+    [req.businessId]
+  );
   const csv = toCsv(rows, [
     { label: 'Fecha', value: (r) => r.created_at },
     { label: 'Producto', value: (r) => r.product_name },
@@ -63,8 +68,12 @@ movementsRouter.get('/export.csv', (req, res) => {
   sendCsv(res, 'movimientos.csv', csv);
 });
 
-const registerMovement = db.transaction((productId, type, quantity, note) => {
-  const product = db.prepare('SELECT * FROM products WHERE id = ?').get(productId);
+async function registerMovement(client, businessId, productId, type, quantity, note) {
+  const { rows: productRows } = await client.query(
+    'SELECT * FROM products WHERE business_id = $1 AND id = $2 FOR UPDATE',
+    [businessId, productId]
+  );
+  const product = productRows[0];
   if (!product) {
     const err = new Error('Producto no encontrado');
     err.status = 404;
@@ -82,22 +91,25 @@ const registerMovement = db.transaction((productId, type, quantity, note) => {
     throw err;
   }
 
-  db.prepare("UPDATE products SET stock = ?, updated_at = datetime('now') WHERE id = ?").run(
+  await client.query('UPDATE products SET stock = $1, updated_at = now() WHERE id = $2', [
     newStock,
-    productId
+    productId,
+  ]);
+
+  const { rows } = await client.query(
+    `INSERT INTO movements (business_id, product_id, type, quantity, stock_after, note, unit_price, unit_cost)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id`,
+    [businessId, productId, type, quantity, newStock, note || null, product.price, product.cost]
   );
 
-  const result = db
-    .prepare(
-      `INSERT INTO movements (product_id, type, quantity, stock_after, note, unit_price, unit_cost)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    )
-    .run(productId, type, quantity, newStock, note || null, product.price, product.cost);
+  const { rows: joined } = await client.query(`${MOVEMENTS_QUERY} WHERE movements.id = $1`, [
+    rows[0].id,
+  ]);
+  return joined[0];
+}
 
-  return db.prepare(MOVEMENTS_QUERY + ' WHERE movements.id = ?').get(result.lastInsertRowid);
-});
-
-movementsRouter.post('/', (req, res) => {
+movementsRouter.post('/', async (req, res) => {
   const { productId, type, quantity, note } = req.body ?? {};
 
   if (!productId || !type || quantity === undefined) {
@@ -111,16 +123,81 @@ movementsRouter.post('/', (req, res) => {
     return res.status(400).json({ error: 'La cantidad debe ser un número válido' });
   }
 
+  const client = await pool.connect();
   try {
-    const row = registerMovement(productId, type, qty, note);
+    await client.query('BEGIN');
+    const row = await registerMovement(client, req.businessId, productId, type, qty, note);
+    await client.query('COMMIT');
+
     const movement = serializeMovement(row);
     broadcast(
       'movement',
       { productName: movement.productName, type: movement.type, quantity: movement.quantity },
-      req.headers['x-client-id']
+      req.headers['x-client-id'],
+      req.businessId
     );
     res.status(201).json(movement);
   } catch (err) {
+    await client.query('ROLLBACK');
     res.status(err.status || 500).json({ error: err.message || 'Error interno' });
+  } finally {
+    client.release();
   }
+});
+
+// El PDF se arma al momento a partir del movimiento ya guardado: no hace
+// falta una tabla de facturas propia porque el precio/costo vigentes ya
+// quedaron congelados en la fila del movimiento en el momento de la venta.
+movementsRouter.get('/:id/invoice.pdf', async (req, res) => {
+  const { rows } = await pool.query(`${MOVEMENTS_QUERY} WHERE movements.business_id = $1 AND movements.id = $2`, [
+    req.businessId,
+    req.params.id,
+  ]);
+  const movement = rows[0];
+  if (!movement) return res.status(404).json({ error: 'Movimiento no encontrado' });
+
+  const { rows: businessRows } = await pool.query('SELECT name FROM businesses WHERE id = $1', [
+    req.businessId,
+  ]);
+  const businessName = businessRows[0]?.name || 'Mostrador';
+  const total = movement.quantity * movement.unit_price;
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="recibo-${movement.id}.pdf"`);
+
+  const doc = new PDFDocument({ size: 'A5', margin: 40 });
+  doc.pipe(res);
+
+  doc.fontSize(18).text(businessName, { align: 'center' });
+  doc.moveDown(0.2);
+  doc.fontSize(10).fillColor('#666').text('Recibo de venta', { align: 'center' });
+  doc.moveDown();
+
+  doc.fillColor('#000').fontSize(10);
+  doc.text(`Recibo N°: ${movement.id}`);
+  doc.text(`Fecha: ${new Date(movement.created_at).toLocaleString('es-CL')}`);
+  doc.moveDown();
+
+  doc.fontSize(12).text(movement.product_name);
+  doc.fontSize(10).fillColor('#444');
+  doc.text(`Cantidad: ${movement.quantity}`);
+  doc.text(`Precio unitario: ${formatClp(movement.unit_price)}`);
+  doc.moveDown();
+
+  doc.fillColor('#000').fontSize(13).text(`Total: ${formatClp(total)}`, { align: 'right' });
+
+  if (movement.note) {
+    doc.moveDown();
+    doc.fontSize(9).fillColor('#666').text(`Nota: ${movement.note}`);
+  }
+
+  doc.moveDown(2);
+  doc
+    .fontSize(8)
+    .fillColor('#999')
+    .text('Recibo generado por Mostrador — no válido como documento tributario.', {
+      align: 'center',
+    });
+
+  doc.end();
 });

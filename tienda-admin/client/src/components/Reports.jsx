@@ -22,7 +22,7 @@ import {
 } from './icons.jsx';
 
 const currency = (n) =>
-  Number(n || 0).toLocaleString('es', { style: 'currency', currency: 'USD' });
+  Number(n || 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' });
 
 function currentMonth() {
   const now = new Date();
@@ -401,7 +401,7 @@ export default function Reports() {
                 </p>
                 {analysis.generatedAt && (
                   <p className="mt-3 text-xs text-slate-400">
-                    Generado el {new Date(analysis.generatedAt.replace(' ', 'T') + 'Z').toLocaleString('es')}
+                    Generado el {new Date(analysis.generatedAt).toLocaleString('es')}
                   </p>
                 )}
               </div>

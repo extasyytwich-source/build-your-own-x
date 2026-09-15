@@ -19,7 +19,7 @@ const CameraScannerModal = lazy(() => import('./CameraScannerModal.jsx'));
 const CAMERA_SUPPORTED = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
 
 const currency = (n) =>
-  Number(n || 0).toLocaleString('es', { style: 'currency', currency: 'USD' });
+  Number(n || 0).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' });
 
 export default function ProductList() {
   const [products, setProducts] = useState([]);

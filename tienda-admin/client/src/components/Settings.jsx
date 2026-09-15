@@ -2,15 +2,29 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import QRCode from 'qrcode';
 import { api } from '../api.js';
+import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import { IconDownload, IconUpload, IconFileText, IconSmartphone } from './icons.jsx';
 
+const SUBSCRIPTION_LABELS = {
+  activa: 'Activa',
+  pendiente_pago: 'Pendiente de pago',
+  atrasada: 'Atrasada',
+  cancelada: 'Cancelada',
+};
+
 export default function Settings() {
-  const [currentPin, setCurrentPin] = useState('');
-  const [newPin, setNewPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
+  const { subscriptionStatus, refreshSubscriptionStatus } = useAuth();
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const [billing, setBilling] = useState(null);
+  const [cancelingSubscription, setCancelingSubscription] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const [aiStatus, setAiStatus] = useState(null);
   const [apiKeyInput, setApiKeyInput] = useState('');
@@ -20,36 +34,21 @@ export default function Settings() {
   const [exportingKind, setExportingKind] = useState(null);
   const [restoreFile, setRestoreFile] = useState(null);
   const [restoring, setRestoring] = useState(false);
-  const [restoreReady, setRestoreReady] = useState(null); // { canAutoRestart }
-  const [restarting, setRestarting] = useState(false);
   const fileInputRef = useRef(null);
 
-  const [lanInfo, setLanInfo] = useState(null);
-  const [selectedIp, setSelectedIp] = useState(null);
   const [qrDataUrl, setQrDataUrl] = useState(null);
-
   const { notify } = useToast();
+
+  const panelUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
   useEffect(() => {
     api.getAiSettings().then(setAiStatus).catch(() => {});
-    api
-      .getLanInfo()
-      .then((info) => {
-        setLanInfo(info);
-        setSelectedIp(info.ips[0] || null);
-      })
-      .catch(() => {});
+    api.getBillingStatus().then(setBilling).catch(() => {});
   }, []);
 
-  const phoneUrl = lanInfo && selectedIp ? `${lanInfo.protocol}://${selectedIp}:${lanInfo.port}` : null;
-
   useEffect(() => {
-    if (!phoneUrl) {
-      setQrDataUrl(null);
-      return undefined;
-    }
     let cancelled = false;
-    QRCode.toDataURL(phoneUrl, { margin: 1, width: 168 })
+    QRCode.toDataURL(panelUrl, { margin: 1, width: 168 })
       .then((url) => {
         if (!cancelled) setQrDataUrl(url);
       })
@@ -57,25 +56,40 @@ export default function Settings() {
     return () => {
       cancelled = true;
     };
-  }, [phoneUrl]);
+  }, [panelUrl]);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (newPin !== confirmPin) {
-      notify('El nuevo PIN y la confirmación no coinciden', 'error');
+    if (newPassword !== confirmPassword) {
+      notify('La nueva contraseña y la confirmación no coinciden', 'error');
       return;
     }
     setSaving(true);
     try {
-      await api.changePin(currentPin, newPin);
-      notify('PIN actualizado correctamente');
-      setCurrentPin('');
-      setNewPin('');
-      setConfirmPin('');
+      await api.changePassword(currentPassword, newPassword);
+      notify('Contraseña actualizada correctamente');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (err) {
       notify(err.message, 'error');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleCancelSubscription() {
+    setCancelingSubscription(true);
+    try {
+      await api.cancelSubscription();
+      notify('Suscripción cancelada');
+      setBilling(await api.getBillingStatus());
+      await refreshSubscriptionStatus();
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setCancelingSubscription(false);
+      setConfirmCancel(false);
     }
   }
 
@@ -138,9 +152,8 @@ export default function Settings() {
   async function confirmRestore() {
     setRestoring(true);
     try {
-      const result = await api.restoreBackup(restoreFile);
-      setRestoreReady({ canAutoRestart: result.canAutoRestart });
-      notify('Respaldo cargado');
+      await api.restoreBackup(restoreFile);
+      notify('Respaldo restaurado correctamente');
     } catch (err) {
       notify(err.message, 'error');
     } finally {
@@ -150,71 +163,86 @@ export default function Settings() {
     }
   }
 
-  async function handleRestoreReadyConfirm() {
-    if (!restoreReady?.canAutoRestart) {
-      setRestoreReady(null);
-      return;
-    }
-    setRestarting(true);
-    try {
-      await api.restartApp();
-    } catch (err) {
-      notify(err.message, 'error');
-      setRestarting(false);
-    }
-  }
-
   return (
     <div>
       <h1 className="mb-6 text-2xl font-semibold text-slate-800">Ajustes</h1>
 
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="card max-w-sm p-6"
+      >
+        <h2 className="mb-1 text-sm font-semibold text-slate-700">Suscripción</h2>
+        <div className="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
+          <span className="text-slate-600">
+            Estado: <strong>{SUBSCRIPTION_LABELS[billing?.subscriptionStatus] ?? '—'}</strong>
+          </span>
+          <span className="font-medium text-slate-800">$20.000/mes</span>
+        </div>
+        {billing?.subscriptionVence && (
+          <p className="mb-4 text-xs text-slate-500">
+            Vence: {new Date(billing.subscriptionVence).toLocaleDateString('es-CL')}
+          </p>
+        )}
+        {billing?.subscriptionStatus === 'activa' && (
+          <button
+            onClick={() => setConfirmCancel(true)}
+            className="text-xs text-rose-600 underline"
+          >
+            Cancelar suscripción
+          </button>
+        )}
+      </motion.div>
+
       <motion.form
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
         onSubmit={handleSubmit}
-        className="card max-w-sm space-y-4 p-6"
+        className="card mt-6 max-w-sm space-y-4 p-6"
       >
+        <h2 className="text-sm font-semibold text-slate-700">Cambiar contraseña</h2>
         <div>
-          <label className="label">PIN actual</label>
+          <label className="label">Contraseña actual</label>
           <input
             required
             type="password"
             className="input"
-            value={currentPin}
-            onChange={(e) => setCurrentPin(e.target.value)}
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
           />
         </div>
         <div>
-          <label className="label">Nuevo PIN</label>
+          <label className="label">Nueva contraseña</label>
           <input
             required
             type="password"
-            minLength={4}
+            minLength={8}
             className="input"
-            value={newPin}
-            onChange={(e) => setNewPin(e.target.value)}
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
           />
         </div>
         <div>
-          <label className="label">Confirmar nuevo PIN</label>
+          <label className="label">Confirmar nueva contraseña</label>
           <input
             required
             type="password"
-            minLength={4}
+            minLength={8}
             className="input"
-            value={confirmPin}
-            onChange={(e) => setConfirmPin(e.target.value)}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
           />
         </div>
         <button type="submit" disabled={saving} className="btn-primary w-full">
-          {saving ? 'Guardando…' : 'Actualizar PIN'}
+          {saving ? 'Guardando…' : 'Actualizar contraseña'}
         </button>
       </motion.form>
 
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
+        transition={{ delay: 0.1 }}
         className="card mt-6 max-w-sm p-6"
       >
         <h2 className="mb-1 text-sm font-semibold text-slate-700">Análisis con IA</h2>
@@ -250,12 +278,12 @@ export default function Settings() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        transition={{ delay: 0.15 }}
         className="card mt-6 max-w-lg p-6"
       >
         <h2 className="mb-1 text-sm font-semibold text-slate-700">Respaldo y exportación</h2>
         <p className="mb-4 text-xs text-slate-500">
-          Guarda una copia completa de los datos, o expórtalos en CSV para revisarlos en Excel.
+          Guarda una copia de tus datos, o expórtalos en CSV para revisarlos en Excel.
         </p>
 
         <div className="mb-4 flex flex-wrap gap-2">
@@ -280,7 +308,7 @@ export default function Settings() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".db"
+            accept=".json"
             className="hidden"
             onChange={handlePickRestoreFile}
           />
@@ -312,7 +340,7 @@ export default function Settings() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
+        transition={{ delay: 0.2 }}
         className="card mt-6 max-w-lg p-6"
       >
         <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
@@ -320,54 +348,19 @@ export default function Settings() {
           Usar desde tu teléfono
         </h2>
         <p className="mb-4 text-xs text-slate-500">
-          Escanea productos con la cámara del teléfono: ábrelo en la misma red Wi-Fi de la tienda.
+          Escanea este código con la cámara del teléfono para abrir el panel e iniciar sesión ahí
+          también — sirve para usar el escáner de código de barras caminando por la tienda.
         </p>
-
-        {!lanInfo ? (
-          <p className="text-xs text-slate-400">Buscando la dirección de red…</p>
-        ) : lanInfo.ips.length === 0 ? (
-          <p className="text-xs text-slate-400">
-            No se detectó una red local. Conecta esta computadora a Wi-Fi o Ethernet.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-            {qrDataUrl && (
-              <img
-                src={qrDataUrl}
-                alt="Código QR para abrir el panel en el teléfono"
-                className="h-36 w-36 flex-shrink-0 rounded-xl border border-slate-200 p-2"
-              />
-            )}
-            <div className="flex-1 text-sm">
-              <p className="mb-2 break-all font-mono text-xs text-slate-600">{phoneUrl}</p>
-              {lanInfo.ips.length > 1 && (
-                <select
-                  className="input mb-2"
-                  value={selectedIp}
-                  onChange={(e) => setSelectedIp(e.target.value)}
-                >
-                  {lanInfo.ips.map((ip) => (
-                    <option key={ip} value={ip}>
-                      {ip}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {lanInfo.protocol === 'https' ? (
-                <p className="text-xs text-slate-500">
-                  Escanea el código QR con la cámara del teléfono, o escribe la dirección de arriba en su
-                  navegador. La primera vez va a mostrar una advertencia de seguridad (el certificado es de
-                  esta computadora, no de una entidad pública) — toca "Avanzado" y "Continuar" para entrar.
-                </p>
-              ) : (
-                <p className="text-xs text-amber-600">
-                  El escaneo con cámara necesita HTTPS. Usa la app de escritorio, o compila el cliente y
-                  arranca el servidor en modo producción para activarlo.
-                </p>
-              )}
-            </div>
-          </div>
-        )}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          {qrDataUrl && (
+            <img
+              src={qrDataUrl}
+              alt="Código QR para abrir el panel en el teléfono"
+              className="h-36 w-36 flex-shrink-0 rounded-xl border border-slate-200 p-2"
+            />
+          )}
+          <p className="break-all font-mono text-xs text-slate-600">{panelUrl}</p>
+        </div>
       </motion.div>
 
       <ConfirmDialog
@@ -383,19 +376,12 @@ export default function Settings() {
       />
 
       <ConfirmDialog
-        open={Boolean(restoreReady)}
-        onClose={() => setRestoreReady(null)}
-        onConfirm={handleRestoreReadyConfirm}
-        title="Respaldo listo"
-        message={
-          restoreReady?.canAutoRestart
-            ? 'El respaldo se cargó correctamente. Se aplicará al reiniciar el programa.'
-            : 'El respaldo se cargó correctamente. Cierra y vuelve a abrir el programa para aplicarlo.'
-        }
-        confirmLabel={
-          restarting ? 'Reiniciando…' : restoreReady?.canAutoRestart ? 'Reiniciar ahora' : 'Entendido'
-        }
-        tone="primary"
+        open={confirmCancel}
+        onClose={() => setConfirmCancel(false)}
+        onConfirm={handleCancelSubscription}
+        title="Cancelar suscripción"
+        message="Se bloqueará el acceso al panel hasta que vuelvas a suscribirte. Tus datos no se borran."
+        confirmLabel={cancelingSubscription ? 'Cancelando…' : 'Sí, cancelar'}
       />
     </div>
   );

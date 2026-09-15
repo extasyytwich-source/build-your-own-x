@@ -1,112 +1,47 @@
-import Database from 'better-sqlite3';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import fs from 'node:fs';
+import pgPkg from 'pg';
+import 'dotenv/config';
+import { runMigrations } from './migrate.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// En la app de escritorio (Electron), DATA_DIR apunta a la carpeta de datos
-// del usuario del sistema operativo, para que la base de datos sobreviva
-// actualizaciones del programa. Sin esa variable (modo servidor/dev), usa la
-// carpeta local del proyecto.
-const dataDir = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
+const { Pool, types } = pgPkg;
 
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+// Evita conversiones de node-pg que dependerían de la zona horaria del
+// servidor o perderían precisión: las fechas simples quedan como texto
+// 'YYYY-MM-DD' tal cual las guardó Postgres, y los números vuelven como
+// number de JS en vez de string.
+types.setTypeParser(1082, (val) => val); // date
+types.setTypeParser(1700, (val) => parseFloat(val)); // numeric
+types.setTypeParser(20, (val) => parseInt(val, 10)); // bigint (COUNT)
+
+const connectionString =
+  process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/tienda_admin_dev';
+
+export const pool = new Pool({
+  connectionString,
+  ssl: /localhost|127\.0\.0\.1/.test(connectionString) ? false : { rejectUnauthorized: false },
+});
+
+let readyPromise = null;
+
+// Cada ruta espera esto antes de su primera consulta (ver el middleware en
+// index.js), así el servidor no atiende pedidos hasta que las migraciones
+// terminaron de correr.
+export function ready() {
+  if (!readyPromise) readyPromise = runMigrations(pool);
+  return readyPromise;
 }
 
-const dbPath = path.join(dataDir, 'tienda.db');
-const pendingRestorePath = `${dbPath}.pending-restore`;
-
-// El restore de un respaldo no reemplaza el archivo mientras el programa está
-// corriendo (la conexión ya abierta seguiría apuntando al archivo viejo): en
-// vez de eso, /api/settings/restore deja el archivo subido aquí, y este
-// bloque lo aplica en el siguiente arranque, antes de abrir la base real.
-if (fs.existsSync(pendingRestorePath)) {
-  for (const suffix of ['-wal', '-shm']) {
-    const sidecar = dbPath + suffix;
-    if (fs.existsSync(sidecar)) fs.rmSync(sidecar);
-  }
-  fs.renameSync(pendingRestorePath, dbPath);
+export async function getSetting(businessId, key) {
+  const { rows } = await pool.query(
+    'SELECT value FROM settings WHERE business_id = $1 AND key = $2',
+    [businessId, key]
+  );
+  return rows[0]?.value ?? null;
 }
 
-export const db = new Database(dbPath);
-
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    sku TEXT UNIQUE,
-    category TEXT DEFAULT 'General',
-    price REAL NOT NULL DEFAULT 0,
-    cost REAL NOT NULL DEFAULT 0,
-    stock REAL NOT NULL DEFAULT 0,
-    min_stock REAL NOT NULL DEFAULT 0,
-    unit TEXT NOT NULL DEFAULT 'unidad',
-    description TEXT,
-    image_url TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+export async function setSetting(businessId, key, value) {
+  await pool.query(
+    `INSERT INTO settings (business_id, key, value) VALUES ($1, $2, $3)
+     ON CONFLICT (business_id, key) DO UPDATE SET value = EXCLUDED.value`,
+    [businessId, key, value]
   );
-
-  CREATE TABLE IF NOT EXISTS movements (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    type TEXT NOT NULL CHECK (type IN ('entrada', 'salida', 'ajuste')),
-    quantity REAL NOT NULL,
-    stock_after REAL NOT NULL,
-    note TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS cash_entries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    entry_date TEXT NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('ingreso', 'faltante')),
-    amount REAL NOT NULL,
-    note TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS monthly_analyses (
-    month TEXT PRIMARY KEY,
-    analysis TEXT NOT NULL,
-    generated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_movements_product ON movements(product_id);
-  CREATE INDEX IF NOT EXISTS idx_movements_created ON movements(created_at);
-  CREATE INDEX IF NOT EXISTS idx_cash_entries_date ON cash_entries(entry_date);
-`);
-
-function ensureColumn(table, column, definition) {
-  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
-  if (!columns.some((c) => c.name === column)) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-  }
 }
-
-// Guarda el precio/costo vigentes al momento del movimiento, para que los
-// reportes mensuales reflejen las ganancias reales aunque el precio cambie después.
-ensureColumn('movements', 'unit_price', 'REAL NOT NULL DEFAULT 0');
-ensureColumn('movements', 'unit_cost', 'REAL NOT NULL DEFAULT 0');
-
-export function getSetting(key) {
-  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
-  return row ? row.value : null;
-}
-
-export function setSetting(key, value) {
-  db.prepare(
-    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
-  ).run(key, value);
-}
-
-export { dbPath, dataDir, pendingRestorePath };

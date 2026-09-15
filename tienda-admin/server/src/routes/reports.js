@@ -1,41 +1,49 @@
 import { Router } from 'express';
-import { db } from '../db.js';
+import { pool } from '../db.js';
 import { currentMonthStr } from '../dates.js';
 import { computeMonthlyStats } from '../reports.js';
 import { generateMonthlyAnalysis } from '../ai.js';
 
 export const reportsRouter = Router();
 
-reportsRouter.get('/monthly', (req, res) => {
+reportsRouter.get('/monthly', async (req, res) => {
   const month = req.query.month || currentMonthStr();
   try {
-    res.json(computeMonthlyStats(month));
+    res.json(await computeMonthlyStats(req.businessId, month));
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message || 'Error interno' });
   }
 });
 
-reportsRouter.get('/monthly/analysis', (req, res) => {
+reportsRouter.get('/monthly/analysis', async (req, res) => {
   const month = req.query.month || currentMonthStr();
-  const row = db.prepare('SELECT * FROM monthly_analyses WHERE month = ?').get(month);
-  if (!row) return res.json({ analysis: null, generatedAt: null });
-  res.json({ analysis: row.analysis, generatedAt: row.generated_at });
+  const { rows } = await pool.query(
+    'SELECT * FROM monthly_analyses WHERE business_id = $1 AND month = $2',
+    [req.businessId, month]
+  );
+  if (!rows[0]) return res.json({ analysis: null, generatedAt: null });
+  res.json({ analysis: rows[0].analysis, generatedAt: rows[0].generated_at });
 });
 
 reportsRouter.post('/monthly/analysis', async (req, res) => {
   const month = req.body?.month || currentMonthStr();
   try {
-    const stats = computeMonthlyStats(month);
-    const analysis = await generateMonthlyAnalysis(stats, month);
+    const stats = await computeMonthlyStats(req.businessId, month);
+    const analysis = await generateMonthlyAnalysis(req.businessId, stats, month);
 
-    db.prepare(
-      `INSERT INTO monthly_analyses (month, analysis, generated_at)
-       VALUES (?, ?, datetime('now'))
-       ON CONFLICT(month) DO UPDATE SET analysis = excluded.analysis, generated_at = excluded.generated_at`
-    ).run(month, analysis);
+    await pool.query(
+      `INSERT INTO monthly_analyses (business_id, month, analysis, generated_at)
+       VALUES ($1, $2, $3, now())
+       ON CONFLICT (business_id, month) DO UPDATE
+         SET analysis = EXCLUDED.analysis, generated_at = EXCLUDED.generated_at`,
+      [req.businessId, month, analysis]
+    );
 
-    const row = db.prepare('SELECT * FROM monthly_analyses WHERE month = ?').get(month);
-    res.json({ analysis: row.analysis, generatedAt: row.generated_at });
+    const { rows } = await pool.query(
+      'SELECT * FROM monthly_analyses WHERE business_id = $1 AND month = $2',
+      [req.businessId, month]
+    );
+    res.json({ analysis: rows[0].analysis, generatedAt: rows[0].generated_at });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message || 'Error interno' });
   }

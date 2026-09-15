@@ -6,12 +6,13 @@ import { getSetting } from './db.js';
 // un .env que el dueño de la tienda pueda editar). La de la base de datos
 // gana si ambas están presentes, para que cambiarla desde la UI funcione de
 // inmediato sin reiniciar el programa.
-export function getEffectiveApiKey() {
-  return getSetting('anthropic_api_key') || process.env.ANTHROPIC_API_KEY || null;
+export async function getEffectiveApiKey(businessId) {
+  const stored = await getSetting(businessId, 'anthropic_api_key');
+  return stored || process.env.ANTHROPIC_API_KEY || null;
 }
 
-function getClient() {
-  const apiKey = getEffectiveApiKey();
+async function getClient(businessId) {
+  const apiKey = await getEffectiveApiKey(businessId);
   if (!apiKey) return null;
   return new Anthropic({ apiKey });
 }
@@ -33,8 +34,8 @@ breve y directo de máximo 200 palabras que cubra en este orden:
 Tono profesional pero cercano, como si le hablaras directamente al dueño de la
 tienda. No inventes datos que no estén en el JSON.`;
 
-export async function generateMonthlyAnalysis(stats, month) {
-  const anthropic = getClient();
+export async function generateMonthlyAnalysis(businessId, stats, month) {
+  const anthropic = await getClient(businessId);
   if (!anthropic) {
     const err = new Error(
       'Configura tu API key de Anthropic en Ajustes para habilitar el análisis con IA'

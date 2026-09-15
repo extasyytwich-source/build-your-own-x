@@ -31,15 +31,20 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
   const data = await res.json().catch(() => ({}));
 
   // 'No autorizado' es lo único que devuelve el middleware de sesión
-  // (requireAuth) cuando el token falta o expiró. Otros 401 (PIN
-  // incorrecto al iniciar sesión o al cambiarlo) traen su propio mensaje
-  // y no deben tratarse como sesión vencida.
+  // (requireAuth) cuando el token falta o expiró. Otros 401 (contraseña
+  // incorrecta al iniciar sesión o al cambiarla) traen su propio mensaje y
+  // no deben tratarse como sesión vencida.
   if (res.status === 401 && data.error === 'No autorizado') {
     setToken(null);
-    const err = new Error('Sesión expirada, vuelve a ingresar el PIN');
+    const err = new Error('Sesión expirada, vuelve a iniciar sesión');
     err.status = 401;
     throw err;
   }
+
+  // 402: requireActiveSubscription bloqueó el pedido porque la suscripción
+  // no está activa. No es un error de sesión, así que se deja pasar el
+  // error normal (con status 402) para que la pantalla de suscripción lo
+  // pueda distinguir.
 
   if (!res.ok) {
     const err = new Error(data.error || 'Ocurrió un error');
@@ -50,9 +55,16 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
 }
 
 export const api = {
-  login: (pin) => request('/auth/login', { method: 'POST', body: { pin }, auth: false }),
-  changePin: (currentPin, newPin) =>
-    request('/auth/change-pin', { method: 'POST', body: { currentPin, newPin } }),
+  signup: (businessName, email, password) =>
+    request('/auth/signup', { method: 'POST', body: { businessName, email, password }, auth: false }),
+  login: (email, password) =>
+    request('/auth/login', { method: 'POST', body: { email, password }, auth: false }),
+  changePassword: (currentPassword, newPassword) =>
+    request('/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } }),
+
+  getBillingStatus: () => request('/billing/status'),
+  subscribe: () => request('/billing/subscribe', { method: 'POST' }),
+  cancelSubscription: () => request('/billing/cancel', { method: 'POST' }),
 
   getProducts: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
@@ -86,38 +98,29 @@ export const api = {
 
   lookupProductByCode: (code) => request(`/products/lookup?code=${encodeURIComponent(code)}`),
 
-  downloadBackup: () => downloadFile('/settings/backup', `tienda-respaldo-${todayStamp()}.db`),
+  downloadBackup: () => downloadFile('/settings/backup', `mostrador-respaldo-${todayStamp()}.json`),
   exportProductsCsv: () => downloadFile('/products/export.csv', 'productos.csv'),
   exportMovementsCsv: () => downloadFile('/movements/export.csv', 'movimientos.csv'),
   exportCashCsv: () => downloadFile('/cash/export.csv', 'caja.csv'),
   restoreBackup: async (file) => {
-    const token = getToken();
-    const res = await fetch('/api/settings/restore', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: file,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = new Error(data.error || 'No se pudo restaurar el respaldo');
-      err.status = res.status;
-      throw err;
+    const text = await file.text();
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new Error('El archivo no es un respaldo válido (.json)');
     }
-    return data;
+    return request('/settings/restore', { method: 'POST', body: parsed });
   },
-  restartApp: () => request('/settings/restart-app', { method: 'POST' }),
 
-  getLanInfo: () => request('/settings/lan-info'),
+  viewInvoice: (movementId) => openFile(`/movements/${movementId}/invoice.pdf`),
 };
 
 function todayStamp() {
   return new Date().toISOString().slice(0, 10);
 }
 
-async function downloadFile(path, filename) {
+async function fetchAsBlob(path) {
   const token = getToken();
   const res = await fetch(`/api${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -126,7 +129,11 @@ async function downloadFile(path, filename) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || 'No se pudo descargar el archivo');
   }
-  const blob = await res.blob();
+  return res.blob();
+}
+
+async function downloadFile(path, filename) {
+  const blob = await fetchAsBlob(path);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -135,4 +142,12 @@ async function downloadFile(path, filename) {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+// Para ver un PDF en una pestaña nueva en vez de descargarlo directo.
+async function openFile(path) {
+  const blob = await fetchAsBlob(path);
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
