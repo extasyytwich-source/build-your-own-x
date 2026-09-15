@@ -12,11 +12,16 @@ export const billingRouter = Router();
 
 billingRouter.get('/status', requireAuth, async (req, res) => {
   const { rows } = await pool.query(
-    'SELECT subscription_status, subscription_vence FROM businesses WHERE id = $1',
+    'SELECT subscription_status, subscription_vence, subscription_exempt FROM businesses WHERE id = $1',
     [req.businessId]
   );
+  // Una cuenta exenta se reporta como "activa" al frontend para que nunca
+  // vea la pantalla de "Suscríbete", sin importar el estado real del pago.
+  const subscriptionStatus = rows[0]?.subscription_exempt
+    ? 'activa'
+    : rows[0]?.subscription_status ?? null;
   res.json({
-    subscriptionStatus: rows[0]?.subscription_status ?? null,
+    subscriptionStatus,
     subscriptionVence: rows[0]?.subscription_vence ?? null,
     amount: SUBSCRIPTION_AMOUNT_CLP,
   });
