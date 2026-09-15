@@ -15,7 +15,7 @@ const EMPTY = {
   description: '',
 };
 
-export default function ProductFormModal({ open, onClose, onSubmit, product }) {
+export default function ProductFormModal({ open, onClose, onSubmit, product, initialSku = '' }) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -36,11 +36,11 @@ export default function ProductFormModal({ open, onClose, onSubmit, product }) {
               unit: product.unit,
               description: product.description || '',
             }
-          : EMPTY
+          : { ...EMPTY, sku: initialSku }
       );
       setError('');
     }
-  }, [open, product]);
+  }, [open, product, initialSku]);
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));

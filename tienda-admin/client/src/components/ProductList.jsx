@@ -30,6 +30,7 @@ export default function ProductList() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [scannedSku, setScannedSku] = useState('');
   const [movementProduct, setMovementProduct] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -76,6 +77,7 @@ export default function ProductList() {
     }
     setFormOpen(false);
     setEditing(null);
+    setScannedSku('');
     loadProducts();
   }
 
@@ -106,7 +108,13 @@ export default function ProductList() {
         notify(`Escaneado: ${product.name}`);
       } catch (err) {
         if (err.status === 401) return handleUnauthorized();
-        notify(`Código no encontrado: ${code}`, 'error');
+        // Ningún producto tiene ese código como SKU todavía: en vez de solo
+        // avisar que no se encontró, se ofrece darlo de alta ahora mismo con
+        // ese código ya puesto, para no tener que volver a escanearlo después.
+        notify(`Código no encontrado — complétalo para agregarlo como producto nuevo`);
+        setEditing(null);
+        setScannedSku(code);
+        setFormOpen(true);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -131,6 +139,7 @@ export default function ProductList() {
         <button
           onClick={() => {
             setEditing(null);
+            setScannedSku('');
             setFormOpen(true);
           }}
           className="btn-primary"
@@ -275,9 +284,11 @@ export default function ProductList() {
       <ProductFormModal
         open={formOpen}
         product={editing}
+        initialSku={scannedSku}
         onClose={() => {
           setFormOpen(false);
           setEditing(null);
+          setScannedSku('');
         }}
         onSubmit={handleCreateOrUpdate}
       />
