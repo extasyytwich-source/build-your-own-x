@@ -128,6 +128,44 @@ function FadeUp({ children, delay = 0, className = '', as: Component = motion.di
   );
 }
 
+const HEADLINE = 'El panel para que tu tienda no pierda de vista ni un producto';
+
+function Headline() {
+  const reduceMotion = useReducedMotion();
+  if (reduceMotion) {
+    return (
+      <h1 className="text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl" style={{ textWrap: 'balance' }}>
+        {HEADLINE}
+      </h1>
+    );
+  }
+  return (
+    <motion.h1
+      initial="hidden"
+      animate="visible"
+      variants={{ visible: { transition: { staggerChildren: 0.035 } } }}
+      className="text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl"
+      style={{ textWrap: 'balance' }}
+    >
+      {HEADLINE.split(' ').map((word, i) => (
+        <motion.span
+          key={i}
+          variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+          className="inline-block"
+        >
+          {word}
+          {i < HEADLINE.split(' ').length - 1 ? ' ' : ''}
+        </motion.span>
+      ))}
+    </motion.h1>
+  );
+}
+
+function CtaArrow({ className = '' }) {
+  return <IconArrowRight className={`h-4 w-4 transition-transform group-hover:translate-x-1 ${className}`} />;
+}
+
 export default function Landing({ onGetStarted, onLogin }) {
   const reduceMotion = useReducedMotion();
 
@@ -136,15 +174,17 @@ export default function Landing({ onGetStarted, onLogin }) {
       <StickyNav onGetStarted={onGetStarted} onLogin={onLogin} />
 
       {/* Hero */}
-      <section className="mx-auto max-w-3xl px-6 pb-16 pt-16 text-center">
-        <motion.h1
-          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl"
-        >
-          El panel para que tu tienda no pierda de vista ni un producto
-        </motion.h1>
+      <section className="relative overflow-hidden px-6 pb-16 pt-16 text-center">
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
+          <motion.div
+            className="absolute left-1/2 top-[-160px] h-[420px] w-[620px] -translate-x-1/2 rounded-full bg-slate-200/50 blur-3xl"
+            animate={reduceMotion ? undefined : { x: [0, 24, 0], y: [0, 14, 0] }}
+            transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        </div>
+
+        <div className="mx-auto max-w-3xl">
+        <Headline />
         <motion.p
           initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -161,8 +201,9 @@ export default function Landing({ onGetStarted, onLogin }) {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row"
         >
-          <button onClick={onGetStarted} className="btn-primary px-6 py-3 text-base">
+          <button onClick={onGetStarted} className="btn-primary group px-6 py-3 text-base">
             Crear cuenta
+            <CtaArrow />
           </button>
           <a href="#producto" className="btn-secondary px-6 py-3 text-base">
             Ver cómo funciona
@@ -185,6 +226,7 @@ export default function Landing({ onGetStarted, onLogin }) {
             <IconStore className="h-3.5 w-3.5" /> Hecho para tiendas en Chile
           </span>
         </motion.div>
+        </div>
       </section>
 
       {/* Producto en movimiento */}
@@ -214,6 +256,7 @@ export default function Landing({ onGetStarted, onLogin }) {
             <FadeUp
               key={before}
               delay={i * 0.05}
+              whileHover={{ y: -3, transition: { duration: 0.2 } }}
               className="card flex flex-col items-stretch gap-4 p-5 sm:flex-row sm:items-center"
             >
               <div className="flex flex-1 items-center gap-3 text-slate-500">
@@ -272,7 +315,12 @@ export default function Landing({ onGetStarted, onLogin }) {
       <section className="border-t border-slate-100 bg-slate-50/60 py-20">
         <div className="mx-auto grid max-w-4xl grid-cols-1 gap-6 px-6 sm:grid-cols-2 lg:grid-cols-4">
           {TRUST.map(({ Icon, title, body }, i) => (
-            <FadeUp key={title} delay={i * 0.05} className="text-center">
+            <FadeUp
+              key={title}
+              delay={i * 0.05}
+              whileHover={{ y: -3, transition: { duration: 0.2 } }}
+              className="rounded-xl p-2 text-center"
+            >
               <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-black text-white">
                 <Icon className="h-5 w-5" />
               </div>
@@ -290,7 +338,10 @@ export default function Landing({ onGetStarted, onLogin }) {
             Un solo plan, sin letra chica
           </h2>
         </FadeUp>
-        <FadeUp className="card mx-auto max-w-sm p-8 text-left">
+        <FadeUp
+          whileHover={{ y: -3, transition: { duration: 0.2 } }}
+          className="card mx-auto max-w-sm p-8 text-left"
+        >
           <p className="text-center text-sm font-medium uppercase tracking-wide text-slate-400">
             Suscripción mensual
           </p>
@@ -304,8 +355,9 @@ export default function Landing({ onGetStarted, onLogin }) {
               </li>
             ))}
           </ul>
-          <button onClick={onGetStarted} className="btn-primary w-full py-3 text-base">
+          <button onClick={onGetStarted} className="btn-primary group w-full py-3 text-base">
             Crear cuenta
+            <CtaArrow />
           </button>
         </FadeUp>
       </section>
@@ -333,8 +385,9 @@ export default function Landing({ onGetStarted, onLogin }) {
           <p className="mx-auto mt-3 max-w-md text-sm text-slate-500">
             Crea tu cuenta ahora y ten tu inventario, ventas y reportes bajo control desde hoy.
           </p>
-          <button onClick={onGetStarted} className="btn-primary mt-6 px-8 py-3 text-base">
+          <button onClick={onGetStarted} className="btn-primary group mt-6 px-8 py-3 text-base">
             Crear cuenta
+            <CtaArrow />
           </button>
         </FadeUp>
       </section>

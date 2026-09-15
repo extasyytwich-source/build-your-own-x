@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { IconStore } from '../icons.jsx';
+import ScrollProgress from './ScrollProgress.jsx';
 
 const LINKS = [
   { href: '#producto', label: 'Producto' },
@@ -7,8 +9,21 @@ const LINKS = [
 ];
 
 export default function StickyNav({ onGetStarted, onLogin }) {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-100 bg-white/80 backdrop-blur">
+    <header
+      className={`sticky top-0 z-40 border-b bg-white/80 backdrop-blur transition-shadow duration-300 ${
+        scrolled ? 'border-slate-200 shadow-sm' : 'border-transparent'
+      }`}
+    >
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
         <a href="#" className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-black text-white">
@@ -41,6 +56,7 @@ export default function StickyNav({ onGetStarted, onLogin }) {
           </button>
         </div>
       </div>
+      <ScrollProgress />
     </header>
   );
 }

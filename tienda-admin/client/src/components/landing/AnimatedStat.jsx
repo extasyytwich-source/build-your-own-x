@@ -18,6 +18,7 @@ export default function AnimatedStat({ icon, value, label, formatter, delay = 0 
       viewport={{ once: true, margin: '-80px' }}
       onViewportEnter={() => setStarted(true)}
       transition={{ duration: 0.4, delay }}
+      whileHover={{ y: -3, transition: { duration: 0.2 } }}
       className="card p-6 text-center"
     >
       <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-black text-white">
