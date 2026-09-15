@@ -66,10 +66,7 @@ export default function Settings() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-semibold text-slate-800">Ajustes</h1>
-      <p className="mb-6 text-sm text-slate-500">
-        Este panel es privado. Cambia el PIN de acceso cuando lo necesites.
-      </p>
+      <h1 className="mb-6 text-2xl font-semibold text-slate-800">Ajustes</h1>
 
       <motion.form
         initial={{ opacity: 0, y: 12 }}
@@ -121,10 +118,7 @@ export default function Settings() {
         className="card mt-6 max-w-sm p-6"
       >
         <h2 className="mb-1 text-sm font-semibold text-slate-700">Análisis con IA</h2>
-        <p className="mb-4 text-xs text-slate-500">
-          Pega aquí tu API key de Anthropic para habilitar el botón "Generar análisis" en
-          Reportes. Se guarda en este programa, no se comparte con nadie más.
-        </p>
+        <p className="mb-4 text-xs text-slate-500">API key de Anthropic para Reportes.</p>
 
         {aiStatus?.configured && (
           <div className="mb-3 flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700">

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext.jsx';
+import { IconLock } from './icons.jsx';
 
 export default function LoginGate() {
   const { login } = useAuth();
@@ -35,14 +36,13 @@ export default function LoginGate() {
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ delay: 0.15, type: 'spring', stiffness: 200 }}
-          className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500 text-2xl text-white shadow-soft"
+          className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500 text-white shadow-soft"
         >
-          🔒
+          <IconLock className="h-6 w-6" />
         </motion.div>
-        <h1 className="text-center text-xl font-semibold text-slate-800">Panel de la Tienda</h1>
-        <p className="mb-6 text-center text-sm text-slate-500">
-          Acceso privado. Ingresa el PIN para continuar.
-        </p>
+        <h1 className="mb-6 text-center text-xl font-semibold text-slate-800">
+          Panel de la Tienda
+        </h1>
 
         <input
           autoFocus

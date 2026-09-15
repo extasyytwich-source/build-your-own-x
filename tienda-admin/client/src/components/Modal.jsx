@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { IconX } from './icons.jsx';
 
 export default function Modal({ open, onClose, title, children, width = 'max-w-md' }) {
   return (
@@ -25,7 +26,7 @@ export default function Modal({ open, onClose, title, children, width = 'max-w-m
                 onClick={onClose}
                 className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
-                ✕
+                <IconX className="h-4 w-4" />
               </button>
             </div>
             {children}

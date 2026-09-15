@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import Modal from './Modal.jsx';
 import SelectableOption from './SelectableOption.jsx';
+import { IconMinusCircle, IconPlusCircle, IconWrench } from './icons.jsx';
 
 const TYPES = [
-  { value: 'salida', label: 'Salida (uso / venta)', icon: '➖' },
-  { value: 'entrada', label: 'Entrada (compra / reposición)', icon: '➕' },
-  { value: 'ajuste', label: 'Ajuste manual de stock', icon: '🛠️' },
+  { value: 'salida', label: 'Salida', Icon: IconMinusCircle },
+  { value: 'entrada', label: 'Entrada', Icon: IconPlusCircle },
+  { value: 'ajuste', label: 'Ajuste de stock', Icon: IconWrench },
 ];
 
 export default function MovementModal({ open, onClose, onSubmit, product }) {
@@ -52,7 +53,7 @@ export default function MovementModal({ open, onClose, onSubmit, product }) {
                 onClick={() => setType(t.value)}
                 layoutId="movement-type-highlight"
               >
-                <span>{t.icon}</span>
+                <t.Icon className="h-4 w-4" />
                 {t.label}
               </SelectableOption>
             ))}

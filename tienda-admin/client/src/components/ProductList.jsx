@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import ProductFormModal from './ProductFormModal.jsx';
 import MovementModal from './MovementModal.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
+import { IconAlertTriangle } from './icons.jsx';
 
 const currency = (n) =>
   Number(n || 0).toLocaleString('es', { style: 'currency', currency: 'USD' });
@@ -90,10 +91,7 @@ export default function ProductList() {
   return (
     <div>
       <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-800">Productos</h1>
-          <p className="text-sm text-slate-500">Administra el catálogo disponible en la tienda.</p>
-        </div>
+        <h1 className="text-2xl font-semibold text-slate-800">Productos</h1>
         <button
           onClick={() => {
             setEditing(null);
@@ -163,7 +161,8 @@ export default function ProductList() {
                             : 'bg-emerald-50 text-emerald-700'
                         }`}
                       >
-                        {p.lowStock && '⚠️'} {p.stock} {p.unit}
+                        {p.lowStock && <IconAlertTriangle className="h-3.5 w-3.5" />}
+                        {p.stock} {p.unit}
                       </span>
                     </td>
                     <td className="px-4 py-3">

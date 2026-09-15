@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import StatCard from './StatCard.jsx';
+import { IconBox, IconCoins, IconAlertTriangle, IconTrendingUp } from './icons.jsx';
 
 const currency = (n) =>
   Number(n || 0).toLocaleString('es', { style: 'currency', currency: 'USD' });
@@ -37,36 +38,33 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-semibold text-slate-800">Panel general</h1>
-      <p className="mb-6 text-sm text-slate-500">
-        Resumen del inventario y la actividad de la tienda.
-      </p>
+      <h1 className="mb-6 text-2xl font-semibold text-slate-800">Panel general</h1>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          icon="📦"
+          icon={<IconBox className="h-5 w-5" />}
           label="Productos activos"
           value={stats.totalProducts}
           accent="brand"
           delay={0}
         />
         <StatCard
-          icon="💰"
-          label="Valor del inventario (costo)"
+          icon={<IconCoins className="h-5 w-5" />}
+          label="Valor del inventario"
           value={stats.totalStockValue}
           formatter={currency}
           accent="emerald"
           delay={0.05}
         />
         <StatCard
-          icon="⚠️"
-          label="Productos con stock bajo"
+          icon={<IconAlertTriangle className="h-5 w-5" />}
+          label="Stock bajo"
           value={stats.lowStockCount}
           accent="amber"
           delay={0.1}
         />
         <StatCard
-          icon="🔁"
+          icon={<IconTrendingUp className="h-5 w-5" />}
           label="Movimientos hoy"
           value={stats.movementsToday}
           accent="rose"
@@ -82,12 +80,11 @@ export default function Dashboard() {
           className="card p-5"
         >
           <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
-            ⚠️ Stock bajo mínimo
+            <IconAlertTriangle className="h-4 w-4 text-amber-500" />
+            Stock bajo mínimo
           </h2>
           {stats.lowStockProducts.length === 0 ? (
-            <p className="text-sm text-slate-400">
-              Todo en orden, ningún producto está por debajo de su mínimo.
-            </p>
+            <p className="text-sm text-slate-400">Ningún producto por debajo de su mínimo.</p>
           ) : (
             <ul className="divide-y divide-slate-100">
               {stats.lowStockProducts.map((p) => (
@@ -109,12 +106,11 @@ export default function Dashboard() {
           className="card p-5"
         >
           <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
-            🔥 Más usados / vendidos
+            <IconTrendingUp className="h-4 w-4 text-brand-500" />
+            Más vendidos
           </h2>
           {stats.topUsedProducts.length === 0 ? (
-            <p className="text-sm text-slate-400">
-              Aún no hay salidas registradas para mostrar un ranking.
-            </p>
+            <p className="text-sm text-slate-400">Sin salidas registradas este mes.</p>
           ) : (
             <ul className="divide-y divide-slate-100">
               {stats.topUsedProducts.map((p) => (

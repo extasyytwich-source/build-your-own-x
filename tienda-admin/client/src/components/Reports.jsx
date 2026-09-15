@@ -5,6 +5,17 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import StatCard from './StatCard.jsx';
 import SelectableOption from './SelectableOption.jsx';
+import {
+  IconCoins,
+  IconReceipt,
+  IconBox,
+  IconAlertTriangle,
+  IconCheckCircle,
+  IconWallet,
+  IconSparkles,
+  IconPlusCircle,
+  IconMinusCircle,
+} from './icons.jsx';
 
 const currency = (n) =>
   Number(n || 0).toLocaleString('es', { style: 'currency', currency: 'USD' });
@@ -105,12 +116,7 @@ export default function Reports() {
   return (
     <div>
       <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-800">Reportes mensuales</h1>
-          <p className="text-sm text-slate-500">
-            Ganancias, reposición, alertas críticas y control de caja del mes.
-          </p>
-        </div>
+        <h1 className="text-2xl font-semibold text-slate-800">Reportes mensuales</h1>
         <input
           type="month"
           value={month}
@@ -125,14 +131,14 @@ export default function Reports() {
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
-              icon="💵"
+              icon={<IconCoins className="h-5 w-5" />}
               label="Ganancias del mes"
               value={report.profit}
               formatter={currency}
               accent="emerald"
             />
             <StatCard
-              icon="🧾"
+              icon={<IconReceipt className="h-5 w-5" />}
               label="Ventas calculadas"
               value={report.revenue}
               formatter={currency}
@@ -140,7 +146,7 @@ export default function Reports() {
               delay={0.05}
             />
             <StatCard
-              icon="📥"
+              icon={<IconBox className="h-5 w-5" />}
               label="Gasto en reposición"
               value={report.restockCost}
               formatter={currency}
@@ -148,7 +154,13 @@ export default function Reports() {
               delay={0.1}
             />
             <StatCard
-              icon={report.cash.difference < 0 ? '⚠️' : '✅'}
+              icon={
+                report.cash.difference < 0 ? (
+                  <IconAlertTriangle className="h-5 w-5" />
+                ) : (
+                  <IconCheckCircle className="h-5 w-5" />
+                )
+              }
               label="Diferencia de caja"
               value={report.cash.difference}
               formatter={currency}
@@ -163,7 +175,10 @@ export default function Reports() {
               animate={{ opacity: 1, y: 0 }}
               className="card p-5"
             >
-              <h2 className="mb-4 text-sm font-semibold text-slate-700">📦 A reponer ahora</h2>
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <IconBox className="h-4 w-4 text-amber-500" />
+                A reponer ahora
+              </h2>
               {report.restockNeeded.length === 0 ? (
                 <p className="text-sm text-slate-400">Ningún producto necesita reposición.</p>
               ) : (
@@ -186,8 +201,9 @@ export default function Reports() {
               transition={{ delay: 0.05 }}
               className="card p-5"
             >
-              <h2 className="mb-4 text-sm font-semibold text-slate-700">
-                🚨 Alertas críticas
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <IconAlertTriangle className="h-4 w-4 text-rose-500" />
+                Alertas críticas
               </h2>
               {report.criticalItems.length === 0 ? (
                 <p className="text-sm text-slate-400">No hay productos en estado crítico.</p>
@@ -212,11 +228,12 @@ export default function Reports() {
             transition={{ delay: 0.1 }}
             className="card mt-6 p-5"
           >
-            <h2 className="mb-1 text-sm font-semibold text-slate-700">💰 Control de caja</h2>
+            <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <IconWallet className="h-4 w-4 text-brand-500" />
+              Control de caja
+            </h2>
             <p className="mb-4 text-xs text-slate-400">
-              Registra el dinero que realmente ingresó y lo que haga falta, para contrastarlo
-              contra las ventas calculadas por el sistema ({currency(report.cash.expectedRevenue)}
-              ).
+              Ventas del sistema: {currency(report.cash.expectedRevenue)}
             </p>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -231,7 +248,8 @@ export default function Reports() {
                     showCheck={false}
                     className="justify-center"
                   >
-                    ➕ Dinero que ingresó
+                    <IconPlusCircle className="h-4 w-4" />
+                    Ingresó
                   </SelectableOption>
                   <SelectableOption
                     selected={cashForm.type === 'faltante'}
@@ -242,7 +260,8 @@ export default function Reports() {
                     showCheck={false}
                     className="justify-center"
                   >
-                    ➖ Dinero que falta
+                    <IconMinusCircle className="h-4 w-4" />
+                    Falta
                   </SelectableOption>
                 </div>
 
@@ -295,11 +314,16 @@ export default function Reports() {
                       >
                         <div>
                           <span
-                            className={
+                            className={`inline-flex items-center gap-1 ${
                               entry.type === 'ingreso' ? 'text-emerald-600' : 'text-rose-600'
-                            }
+                            }`}
                           >
-                            {entry.type === 'ingreso' ? '➕' : '➖'} {currency(entry.amount)}
+                            {entry.type === 'ingreso' ? (
+                              <IconPlusCircle className="h-3.5 w-3.5" />
+                            ) : (
+                              <IconMinusCircle className="h-3.5 w-3.5" />
+                            )}
+                            {currency(entry.amount)}
                           </span>
                           <div className="text-xs text-slate-400">
                             {entry.date} {entry.note ? `· ${entry.note}` : ''}
@@ -326,7 +350,10 @@ export default function Reports() {
             className="card mt-6 p-5"
           >
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-700">✨ Análisis con IA</h2>
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <IconSparkles className="h-4 w-4 text-brand-500" />
+                Análisis con IA
+              </h2>
               <button
                 onClick={handleGenerateAnalysis}
                 disabled={generating}

@@ -3,11 +3,12 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { IconPlusCircle, IconMinusCircle, IconWrench } from './icons.jsx';
 
 const TYPE_STYLES = {
-  entrada: { label: 'Entrada', className: 'bg-emerald-50 text-emerald-700', icon: '➕' },
-  salida: { label: 'Salida', className: 'bg-rose-50 text-rose-700', icon: '➖' },
-  ajuste: { label: 'Ajuste', className: 'bg-slate-100 text-slate-600', icon: '🛠️' },
+  entrada: { label: 'Entrada', className: 'bg-emerald-50 text-emerald-700', Icon: IconPlusCircle },
+  salida: { label: 'Salida', className: 'bg-rose-50 text-rose-700', Icon: IconMinusCircle },
+  ajuste: { label: 'Ajuste', className: 'bg-slate-100 text-slate-600', Icon: IconWrench },
 };
 
 export default function MovementHistory() {
@@ -35,12 +36,7 @@ export default function MovementHistory() {
   return (
     <div>
       <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-800">Historial de movimientos</h1>
-          <p className="text-sm text-slate-500">
-            Cada entrada, salida y ajuste queda registrado con fecha y hora.
-          </p>
-        </div>
+        <h1 className="text-2xl font-semibold text-slate-800">Historial de movimientos</h1>
         <select className="input sm:max-w-[220px]" value={type} onChange={(e) => setType(e.target.value)}>
           <option value="">Todos los tipos</option>
           <option value="entrada">Entradas</option>
@@ -82,7 +78,8 @@ export default function MovementHistory() {
                         <span
                           className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${style.className}`}
                         >
-                          {style.icon} {style.label}
+                          <style.Icon className="h-3.5 w-3.5" />
+                          {style.label}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-700">{m.quantity}</td>

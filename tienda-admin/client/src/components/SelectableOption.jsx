@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
+import { IconCheck } from './icons.jsx';
 
 /**
  * Botón de opción con el mismo lenguaje visual que el resaltado animado del
@@ -44,7 +45,7 @@ export default function SelectableOption({
               transition={{ duration: 0.15 }}
               className="relative z-10 text-current"
             >
-              ✓
+              <IconCheck className="h-4 w-4" />
             </motion.span>
           )}
         </AnimatePresence>
