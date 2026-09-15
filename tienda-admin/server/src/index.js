@@ -3,8 +3,10 @@ import express from 'express';
 import cors from 'cors';
 import path from 'node:path';
 import fs from 'node:fs';
+import https from 'node:https';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ensurePinConfigured, requireAuth } from './auth.js';
+import { getOrCreateHttpsCert } from './https-cert.js';
 import { authRouter } from './routes/auth.js';
 import { productsRouter } from './routes/products.js';
 import { movementsRouter } from './routes/movements.js';
@@ -57,17 +59,28 @@ export function createApp() {
 // port: 0 deja que el sistema operativo elija un puerto libre (lo usa la app
 // de escritorio, para no chocar con otro programa). Resuelve con el puerto
 // real en el que quedó escuchando.
-export function startServer(options = {}) {
+//
+// HTTPS: los navegadores solo dan acceso a la cámara (para escanear códigos
+// de barras) en conexiones seguras, y eso incluye abrir el panel desde el
+// teléfono por la IP de la red local (no solo "localhost"). Por eso, cuando
+// el cliente ya está compilado (el caso real de uso: la app empaquetada o
+// "npm run build" en producción), el servidor usa un certificado autofirmado
+// propio en vez de HTTP simple.
+export async function startServer(options = {}) {
   const app = createApp();
   const requestedPort = options.port ?? (process.env.PORT ? Number(process.env.PORT) : 4000);
+  const useHttps = options.https ?? (process.env.HTTPS === 'false' ? false : hasClientBuild);
+  const server = useHttps ? https.createServer(await getOrCreateHttpsCert(), app) : app;
+
   return new Promise((resolve, reject) => {
-    const server = app.listen(requestedPort);
-    server.once('listening', () => {
-      const port = server.address().port;
-      console.log(`Tienda Admin API escuchando en http://localhost:${port}`);
-      resolve({ server, port });
+    const listening = server.listen(requestedPort);
+    listening.once('listening', () => {
+      const port = listening.address().port;
+      const protocol = useHttps ? 'https' : 'http';
+      console.log(`Tienda Admin API escuchando en ${protocol}://localhost:${port}`);
+      resolve({ server: listening, port, protocol });
     });
-    server.once('error', reject);
+    listening.once('error', reject);
   });
 }
 

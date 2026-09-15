@@ -30,7 +30,10 @@ pensado para correr en la computadora de la tienda y solo se accede con un PIN.
 - **Lector de código de barras**: en Productos, escanear el código de un
   producto (usando su SKU) abre directo el modal de "Registrar movimiento" —
   no hace falta buscarlo a mano. Funciona con cualquier lector USB/Bluetooth
-  común, que se comporta como un teclado.
+  común (se comporta como un teclado), o con la **cámara del teléfono**: desde
+  Ajustes se puede abrir el panel en el navegador del teléfono (misma red
+  Wi-Fi) y usar el botón "Escanear con cámara" para lo mismo, caminando por
+  la tienda sin depender de la computadora.
 - **Respaldo y exportación** (en Ajustes): descarga una copia completa de la
   base de datos, restaura un respaldo anterior, o exporta productos,
   movimientos y caja a CSV para revisarlos en Excel. La app de escritorio
@@ -105,6 +108,25 @@ cd ../server && npm start                 # deja la API corriendo
 Sirve los archivos de `client/dist` con cualquier servidor estático (o ábrelos
 detrás de la misma API) y dale al dueño de la tienda solo el acceso a esa
 máquina o red local — el panel no debe exponerse a internet público.
+
+Con `client/dist` ya compilado, el servidor arranca automáticamente por
+**HTTPS** (con un certificado propio autofirmado, generado una sola vez y
+guardado en `server/data/`) en vez de HTTP simple. Esto es necesario para que
+el navegador del teléfono dé acceso a la cámara al escanear códigos de barras
+(los navegadores solo lo permiten en conexiones seguras, y eso incluye abrir
+el panel por la IP de la red local, no solo "localhost"). Para forzar HTTP
+en ese modo (por ejemplo, mientras depuras) usa `HTTPS=false npm start`.
+
+### Usar el panel desde el teléfono (escanear con la cámara)
+
+1. Abre **Ajustes** en la computadora → sección "Usar desde tu teléfono".
+2. Escanea el código QR con la cámara del teléfono (o escribe a mano la
+   dirección que se muestra ahí), estando en la misma red Wi-Fi que la tienda.
+3. La primera vez el navegador del teléfono va a mostrar una advertencia de
+   seguridad ("conexión no privada"): es porque el certificado es propio de
+   esa computadora, no de una entidad pública reconocida. Toca "Avanzado" y
+   "Continuar de todas formas" — solo hace falta una vez.
+4. Entra con el mismo PIN y usa "Escanear con cámara" en Productos.
 
 ## Entregarlo como programa de escritorio (recomendado)
 

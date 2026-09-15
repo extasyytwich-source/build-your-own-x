@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -9,7 +9,13 @@ import MovementModal from './MovementModal.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import EmptyState from './EmptyState.jsx';
-import { IconAlertTriangle, IconBox, IconBarcode } from './icons.jsx';
+import { IconAlertTriangle, IconBox, IconBarcode, IconCamera } from './icons.jsx';
+
+// La librería de decodificación (ZXing) pesa bastante: se carga solo cuando
+// alguien realmente abre el escáner de cámara, no en cada visita a Productos.
+const CameraScannerModal = lazy(() => import('./CameraScannerModal.jsx'));
+
+const CAMERA_SUPPORTED = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
 
 const currency = (n) =>
   Number(n || 0).toLocaleString('es', { style: 'currency', currency: 'USD' });
@@ -25,6 +31,7 @@ export default function ProductList() {
   const [editing, setEditing] = useState(null);
   const [movementProduct, setMovementProduct] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   const { handleUnauthorized } = useAuth();
   const { notify } = useToast();
@@ -103,6 +110,11 @@ export default function ProductList() {
   );
   useBarcodeScanner(handleScan, { enabled: scannerEnabled });
 
+  function handleCameraDetected(code) {
+    setCameraOpen(false);
+    handleScan(code);
+  }
+
   const emptyState = useMemo(
     () => !loading && products.length === 0,
     [loading, products]
@@ -157,6 +169,16 @@ export default function ProductList() {
             </motion.span>
             Lector de código de barras activo
           </motion.span>
+        )}
+        {CAMERA_SUPPORTED && (
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setCameraOpen(true)}
+            className="btn-secondary"
+          >
+            <IconCamera className="h-4 w-4" />
+            Escanear con cámara
+          </motion.button>
         )}
       </div>
 
@@ -270,6 +292,27 @@ export default function ProductList() {
         title="Eliminar producto"
         message={`¿Seguro que quieres eliminar "${deleteTarget?.name}"? También se borrará su historial de movimientos.`}
       />
+
+      {cameraOpen && (
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black">
+              <motion.span
+                animate={{ rotate: 360 }}
+                transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                className="h-6 w-6 rounded-full border-2 border-white/20 border-t-white"
+              />
+              <span className="text-sm text-white/60">Preparando la cámara…</span>
+            </div>
+          }
+        >
+          <CameraScannerModal
+            open={cameraOpen}
+            onClose={() => setCameraOpen(false)}
+            onDetected={handleCameraDetected}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

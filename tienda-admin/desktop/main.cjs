@@ -1,10 +1,11 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, session } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 
 let mainWindow = null;
 let backendPort = null;
+let backendProtocol = 'https';
 
 const BACKUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // cada 6 horas
 const BACKUPS_TO_KEEP = 14;
@@ -20,12 +21,26 @@ function getServerSrcDir() {
 // computadora de la tienda. Así el programa es un solo instalador de
 // doble clic.
 async function startBackend() {
-  process.env.DATA_DIR = path.join(app.getPath('userData'), 'data');
-
   const serverEntry = path.join(getServerSrcDir(), 'index.js');
   const serverModule = await import(pathToFileURL(serverEntry).href);
-  const { port } = await serverModule.startServer({ port: 0 });
-  return port;
+  return serverModule.startServer({ port: 0 });
+}
+
+// El servidor embebido usa HTTPS (necesario para que el navegador del
+// teléfono dé acceso a la cámara al escanear códigos de barras) con un
+// certificado autofirmado propio. Esta ventana es la única que carga esa
+// URL, así que en vez de debilitar la verificación de certificados en
+// general, se acepta puntualmente solo ESTE certificado (comparando el PEM
+// exacto) y todo lo demás sigue la verificación normal de Chromium.
+async function pinOwnHttpsCertificate() {
+  const certModule = await import(pathToFileURL(path.join(getServerSrcDir(), 'https-cert.js')).href);
+  const { cert: ownCertPem } = await certModule.getOrCreateHttpsCert();
+
+  session.defaultSession.setCertificateVerifyProc((request, callback) => {
+    const isOwnCert =
+      request.hostname === 'localhost' && request.certificate.data.trim() === ownCertPem.trim();
+    callback(isOwnCert ? 0 : -3); // -3: usar la verificación normal de Chromium para todo lo demás
+  });
 }
 
 function rotateBackups(dir) {
@@ -73,7 +88,7 @@ function createWindow(port) {
     },
   });
 
-  mainWindow.loadURL(`http://localhost:${port}`);
+  mainWindow.loadURL(`${backendProtocol}://localhost:${port}`);
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -120,6 +135,10 @@ function setupAutoUpdater() {
 
 app.whenReady().then(async () => {
   try {
+    // Se fija antes de importar cualquier módulo del servidor: db.js lo lee
+    // al cargarse para decidir dónde guardar la base de datos y el certificado.
+    process.env.DATA_DIR = path.join(app.getPath('userData'), 'data');
+
     // Otras rutas del servidor embebido (como restaurar un respaldo) necesitan
     // reiniciar el programa completo, algo que solo Electron puede hacer.
     global.__tiendaAdminRelaunch = () => {
@@ -127,7 +146,11 @@ app.whenReady().then(async () => {
       app.exit(0);
     };
 
-    backendPort = await startBackend();
+    await pinOwnHttpsCertificate();
+
+    const started = await startBackend();
+    backendPort = started.port;
+    backendProtocol = started.protocol;
     createWindow(backendPort);
 
     setTimeout(runScheduledBackup, 15_000);

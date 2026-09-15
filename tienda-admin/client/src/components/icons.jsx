@@ -160,6 +160,32 @@ export function IconX(props) {
   );
 }
 
+export function IconCamera(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M4 8h2.5l1.2-2h8.6l1.2 2H20a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" />
+      <circle cx="12" cy="14" r="3.5" />
+    </svg>
+  );
+}
+
+export function IconBarcode(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props} strokeWidth={1.6}>
+      <path d="M4 5v14M8 5v14M11 5v14M15 5v14M17.5 5v14M20 5v14" />
+    </svg>
+  );
+}
+
+export function IconSmartphone(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <rect x="6" y="2.5" width="12" height="19" rx="2.5" />
+      <path d="M11 18.2h2" />
+    </svg>
+  );
+}
+
 export function IconCheck(props) {
   return (
     <svg viewBox="0 0 24 24" {...base} {...props}>
@@ -191,14 +217,6 @@ export function IconFileText(props) {
     <svg viewBox="0 0 24 24" {...base} {...props}>
       <path d="M7 3h7l4 4v14H7Z" />
       <path d="M14 3v4h4M9.5 13h5M9.5 16.5h5" />
-    </svg>
-  );
-}
-
-export function IconBarcode(props) {
-  return (
-    <svg viewBox="0 0 24 24" {...base} {...props}>
-      <path d="M4 5v14M8 5v14M11 5v14M15 5v14M17.5 5v14M20 5v14" strokeWidth="1.6" />
     </svg>
   );
 }

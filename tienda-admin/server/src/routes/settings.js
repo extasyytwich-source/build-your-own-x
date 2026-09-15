@@ -2,6 +2,7 @@ import express, { Router } from 'express';
 import fs from 'node:fs';
 import { db, getSetting, setSetting, dbPath, pendingRestorePath } from '../db.js';
 import { getEffectiveApiKey } from '../ai.js';
+import { localNetworkIps } from '../network.js';
 
 export const settingsRouter = Router();
 
@@ -63,6 +64,16 @@ settingsRouter.post(
     res.json({ ok: true, canAutoRestart: typeof global.__tiendaAdminRelaunch === 'function' });
   }
 );
+
+// Para abrir el panel desde el teléfono (y así poder escanear con su
+// cámara) hace falta la IP de la computadora en la red local, no "localhost".
+settingsRouter.get('/lan-info', (req, res) => {
+  res.json({
+    ips: localNetworkIps(),
+    port: req.socket.localPort,
+    protocol: req.protocol,
+  });
+});
 
 settingsRouter.post('/restart-app', (req, res) => {
   if (typeof global.__tiendaAdminRelaunch !== 'function') {

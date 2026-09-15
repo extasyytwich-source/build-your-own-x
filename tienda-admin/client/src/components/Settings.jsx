@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import QRCode from 'qrcode';
 import { api } from '../api.js';
 import { useToast } from '../context/ToastContext.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
-import { IconDownload, IconUpload, IconFileText } from './icons.jsx';
+import { IconDownload, IconUpload, IconFileText, IconSmartphone } from './icons.jsx';
 
 export default function Settings() {
   const [currentPin, setCurrentPin] = useState('');
@@ -23,11 +24,40 @@ export default function Settings() {
   const [restarting, setRestarting] = useState(false);
   const fileInputRef = useRef(null);
 
+  const [lanInfo, setLanInfo] = useState(null);
+  const [selectedIp, setSelectedIp] = useState(null);
+  const [qrDataUrl, setQrDataUrl] = useState(null);
+
   const { notify } = useToast();
 
   useEffect(() => {
     api.getAiSettings().then(setAiStatus).catch(() => {});
+    api
+      .getLanInfo()
+      .then((info) => {
+        setLanInfo(info);
+        setSelectedIp(info.ips[0] || null);
+      })
+      .catch(() => {});
   }, []);
+
+  const phoneUrl = lanInfo && selectedIp ? `${lanInfo.protocol}://${selectedIp}:${lanInfo.port}` : null;
+
+  useEffect(() => {
+    if (!phoneUrl) {
+      setQrDataUrl(null);
+      return undefined;
+    }
+    let cancelled = false;
+    QRCode.toDataURL(phoneUrl, { margin: 1, width: 168 })
+      .then((url) => {
+        if (!cancelled) setQrDataUrl(url);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [phoneUrl]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -277,6 +307,67 @@ export default function Settings() {
             </motion.button>
           ))}
         </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="card mt-6 max-w-lg p-6"
+      >
+        <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+          <IconSmartphone className="h-4 w-4" />
+          Usar desde tu teléfono
+        </h2>
+        <p className="mb-4 text-xs text-slate-500">
+          Escanea productos con la cámara del teléfono: ábrelo en la misma red Wi-Fi de la tienda.
+        </p>
+
+        {!lanInfo ? (
+          <p className="text-xs text-slate-400">Buscando la dirección de red…</p>
+        ) : lanInfo.ips.length === 0 ? (
+          <p className="text-xs text-slate-400">
+            No se detectó una red local. Conecta esta computadora a Wi-Fi o Ethernet.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+            {qrDataUrl && (
+              <img
+                src={qrDataUrl}
+                alt="Código QR para abrir el panel en el teléfono"
+                className="h-36 w-36 flex-shrink-0 rounded-xl border border-slate-200 p-2"
+              />
+            )}
+            <div className="flex-1 text-sm">
+              <p className="mb-2 break-all font-mono text-xs text-slate-600">{phoneUrl}</p>
+              {lanInfo.ips.length > 1 && (
+                <select
+                  className="input mb-2"
+                  value={selectedIp}
+                  onChange={(e) => setSelectedIp(e.target.value)}
+                >
+                  {lanInfo.ips.map((ip) => (
+                    <option key={ip} value={ip}>
+                      {ip}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {lanInfo.protocol === 'https' ? (
+                <p className="text-xs text-slate-500">
+                  Escanea el código QR con la cámara del teléfono, o escribe la dirección de arriba en su
+                  navegador. La primera vez va a mostrar una advertencia de seguridad (el certificado es de
+                  esta computadora, no de una entidad pública) — toca "Avanzado" y "Continuar" para entrar.
+                </p>
+              ) : (
+                <p className="text-xs text-amber-600">
+                  El escaneo con cámara necesita HTTPS. Usa la app de escritorio, o compila el cliente y
+                  arranca el servidor en modo producción para activarlo.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </motion.div>
 
       <ConfirmDialog

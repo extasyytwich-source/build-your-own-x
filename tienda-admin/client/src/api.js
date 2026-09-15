@@ -103,6 +103,8 @@ export const api = {
     return data;
   },
   restartApp: () => request('/settings/restart-app', { method: 'POST' }),
+
+  getLanInfo: () => request('/settings/lan-info'),
 };
 
 function todayStamp() {

@@ -5,6 +5,9 @@ server/data/*.db
 server/data/*.db-shm
 server/data/*.db-wal
 server/data/*.pending-restore
+server/data/local-cert.pem
+server/data/local-key.pem
+server/data/local-cert.json
 *.log
 desktop/release/
 desktop/server/
