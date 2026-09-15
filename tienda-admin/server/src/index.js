@@ -7,7 +7,7 @@ import rateLimit from 'express-rate-limit';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { requireAuth } from './auth.js';
+import { requireAuth, requireOwner } from './auth.js';
 import { ready } from './db.js';
 import { authRouter } from './routes/auth.js';
 import { billingRouter } from './routes/billing.js';
@@ -17,6 +17,8 @@ import { statsRouter } from './routes/stats.js';
 import { cashRouter } from './routes/cash.js';
 import { reportsRouter } from './routes/reports.js';
 import { settingsRouter } from './routes/settings.js';
+import { employeesRouter } from './routes/employees.js';
+import { salesRouter } from './routes/sales.js';
 import { eventsRouter } from './routes/events.js';
 import { requireActiveSubscription } from './billing.js';
 
@@ -89,12 +91,19 @@ export function createApp() {
   app.use('/api/auth', authLimiter, authRouter);
   app.use('/api/billing', billingRouter);
   app.use('/api/events', eventsRouter);
+  // products: lectura compartida (el cajero busca/escanea para el carrito),
+  // la escritura (alta/edición/borrado) queda restringida dentro del propio
+  // router con requireOwner en cada ruta que corresponde.
   app.use('/api/products', requireAuth, requireActiveSubscription, productsRouter);
-  app.use('/api/movements', requireAuth, requireActiveSubscription, movementsRouter);
-  app.use('/api/stats', requireAuth, requireActiveSubscription, statsRouter);
-  app.use('/api/cash', requireAuth, requireActiveSubscription, cashRouter);
-  app.use('/api/reports', requireAuth, requireActiveSubscription, reportsRouter);
-  app.use('/api/settings', requireAuth, requireActiveSubscription, settingsRouter);
+  // El resto es exclusivo del dueño: el cajero solo vende (routes/sales.js).
+  app.use('/api/movements', requireAuth, requireActiveSubscription, requireOwner, movementsRouter);
+  app.use('/api/stats', requireAuth, requireActiveSubscription, requireOwner, statsRouter);
+  app.use('/api/cash', requireAuth, requireActiveSubscription, requireOwner, cashRouter);
+  app.use('/api/reports', requireAuth, requireActiveSubscription, requireOwner, reportsRouter);
+  app.use('/api/settings', requireAuth, requireActiveSubscription, requireOwner, settingsRouter);
+  app.use('/api/employees', requireAuth, requireActiveSubscription, requireOwner, employeesRouter);
+  // Cobrar es lo único que necesita el cajero: compartido entre owner y cajero.
+  app.use('/api/sales', requireAuth, requireActiveSubscription, salesRouter);
 
   if (hasClientBuild) {
     app.use(express.static(clientDist));

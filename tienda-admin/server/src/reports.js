@@ -1,5 +1,6 @@
 import { pool } from './db.js';
 import { monthRange } from './dates.js';
+import { computeTax } from './tax.js';
 
 // Reunido en una función (en vez de vivir solo en la ruta) porque tanto el
 // endpoint de reporte como el de análisis de IA necesitan los mismos datos.
@@ -47,6 +48,29 @@ export async function computeMonthlyStats(businessId, month) {
     )
   ).rows;
 
+  // Desglose de impuestos del mes (para que el dueño sepa cuánto de lo
+  // vendido es IVA/impuesto adicional, no solo el total): cada línea de
+  // venta según la categoría del producto en ese momento.
+  const taxRows = (
+    await pool.query(
+      `SELECT movements.quantity, movements.unit_price, products.tax_category
+       FROM movements JOIN products ON products.id = movements.product_id
+       WHERE movements.business_id = $1 AND movements.type = 'salida'
+         AND movements.created_at >= $2::timestamptz AND movements.created_at < $3::timestamptz`,
+      [businessId, start, end]
+    )
+  ).rows;
+  const taxes = taxRows.reduce(
+    (acc, row) => {
+      const { neto, iva, adicional } = computeTax(row.quantity * row.unit_price, row.tax_category);
+      acc.neto += neto;
+      acc.iva += iva;
+      acc.impuestoAdicional += adicional;
+      return acc;
+    },
+    { neto: 0, iva: 0, impuestoAdicional: 0 }
+  );
+
   const cash = (
     await pool.query(
       `SELECT
@@ -71,6 +95,7 @@ export async function computeMonthlyStats(businessId, month) {
     restockMovements: restocks.count,
     restockNeeded,
     criticalItems,
+    taxes,
     cash: {
       registeredIncome: cash.registeredIncome,
       missingAmount: cash.missingAmount,

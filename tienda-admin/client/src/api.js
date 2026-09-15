@@ -46,7 +46,7 @@ async function request(path, { method = 'GET', body } = {}) {
 export const api = {
   signup: (businessName, email, password) =>
     request('/auth/signup', { method: 'POST', body: { businessName, email, password } }),
-  login: (email, password) => request('/auth/login', { method: 'POST', body: { email, password } }),
+  login: (identifier, password) => request('/auth/login', { method: 'POST', body: { identifier, password } }),
   loginWithGoogle: (credential, businessName) =>
     request('/auth/google', { method: 'POST', body: { credential, businessName } }),
   logout: () => request('/auth/logout', { method: 'POST' }),
@@ -89,6 +89,13 @@ export const api = {
   deleteAiApiKey: () => request('/settings/ai', { method: 'DELETE' }),
 
   lookupProductByCode: (code) => request(`/products/lookup?code=${encodeURIComponent(code)}`),
+
+  createSale: (data) => request('/sales', { method: 'POST', body: data }),
+  viewSaleReceipt: (saleId) => openFile(`/sales/${saleId}/receipt.pdf`),
+
+  getEmployees: () => request('/employees'),
+  createEmployee: (data) => request('/employees', { method: 'POST', body: data }),
+  deleteEmployee: (id) => request(`/employees/${id}`, { method: 'DELETE' }),
 
   downloadBackup: () => downloadFile('/settings/backup', `mostrador-respaldo-${todayStamp()}.json`),
   exportProductsCsv: () => downloadFile('/products/export.csv', 'productos.csv'),

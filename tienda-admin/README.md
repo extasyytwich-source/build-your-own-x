@@ -21,7 +21,18 @@ información de otra tienda. El acceso requiere una suscripción mensual de
 - **Panel general**: valor del inventario, productos con stock bajo y los
   productos más usados/vendidos.
 - **Productos**: alta, edición y baja de productos (nombre, SKU, categoría,
-  precio, costo, stock mínimo, unidad).
+  precio, costo, stock mínimo, unidad, categoría de impuesto).
+- **Caja (punto de venta)**: arma una venta con varios productos a la vez
+  (carrito), cobra en efectivo (con vuelto) o tarjeta, y descuenta el stock
+  de todos los productos de un solo cobro. Avisa antes de cobrar una bebida
+  alcohólica, para recordar pedir identificación.
+- **Empleados**: el dueño da de alta cuentas de cajero (usuario + contraseña,
+  sin necesitar un correo) desde Ajustes. Un cajero entra directo a Caja, sin
+  ver productos, historial, reportes ni ajustes.
+- **Impuestos**: además del IVA (19%), cada producto puede marcarse con el
+  impuesto adicional que la ley chilena cobra sobre bebidas alcohólicas
+  (según grado) o azucaradas — los reportes mensuales muestran el desglose
+  de Neto/IVA/impuesto adicional.
 - **Movimientos de stock**: registra entradas (compras/reposición), salidas
   (uso/venta) y ajustes manuales; el stock del producto se actualiza solo.
 - **Recibos en PDF**: cada venta puede generar un recibo simple en PDF

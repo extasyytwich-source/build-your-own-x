@@ -10,10 +10,12 @@ import {
   IconLogOut,
   IconStore,
   IconWifi,
+  IconWallet,
 } from './icons.jsx';
 
 const ICONS = {
   dashboard: IconGrid,
+  caja: IconWallet,
   products: IconBox,
   history: IconReceipt,
   reports: IconTrendingUp,

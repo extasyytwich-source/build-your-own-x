@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db.js';
 import { toCsv, sendCsv } from '../csv.js';
 import { broadcast } from '../events.js';
+import { requireOwner } from '../auth.js';
 
 export const productsRouter = Router();
 
@@ -18,11 +19,14 @@ function serializeProduct(row) {
     unit: row.unit,
     description: row.description,
     imageUrl: row.image_url,
+    taxCategory: row.tax_category,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     lowStock: row.stock <= row.min_stock,
   };
 }
+
+const VALID_TAX_CATEGORIES = ['general', 'alcohol_mas_20', 'alcohol_hasta_20', 'bebida_azucarada', 'exento'];
 
 const PRODUCT_EXPORT_COLUMNS = [
   { label: 'Nombre', value: (r) => r.name },
@@ -34,6 +38,7 @@ const PRODUCT_EXPORT_COLUMNS = [
   { label: 'Stock mínimo', value: (r) => r.min_stock },
   { label: 'Unidad', value: (r) => r.unit },
   { label: 'Descripción', value: (r) => r.description },
+  { label: 'Categoría de impuesto', value: (r) => r.tax_category },
 ];
 
 productsRouter.get('/', async (req, res) => {
@@ -81,7 +86,7 @@ productsRouter.get('/lookup', async (req, res) => {
   res.json(serializeProduct(rows[0]));
 });
 
-productsRouter.get('/export.csv', async (req, res) => {
+productsRouter.get('/export.csv', requireOwner, async (req, res) => {
   const { rows } = await pool.query(
     'SELECT * FROM products WHERE business_id = $1 ORDER BY name ASC',
     [req.businessId]
@@ -98,8 +103,8 @@ productsRouter.get('/:id', async (req, res) => {
   res.json(serializeProduct(rows[0]));
 });
 
-productsRouter.post('/', async (req, res) => {
-  const { name, sku, category, price, cost, stock, minStock, unit, description, imageUrl } =
+productsRouter.post('/', requireOwner, async (req, res) => {
+  const { name, sku, category, price, cost, stock, minStock, unit, description, imageUrl, taxCategory } =
     req.body ?? {};
 
   if (!name || String(name).trim() === '') {
@@ -109,8 +114,8 @@ productsRouter.post('/', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `INSERT INTO products
-        (business_id, name, sku, category, price, cost, stock, min_stock, unit, description, image_url)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        (business_id, name, sku, category, price, cost, stock, min_stock, unit, description, image_url, tax_category)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         req.businessId,
@@ -124,6 +129,7 @@ productsRouter.post('/', async (req, res) => {
         unit || 'unidad',
         description || null,
         imageUrl || null,
+        VALID_TAX_CATEGORIES.includes(taxCategory) ? taxCategory : 'general',
       ]
     );
 
@@ -143,7 +149,7 @@ productsRouter.post('/', async (req, res) => {
   }
 });
 
-productsRouter.put('/:id', async (req, res) => {
+productsRouter.put('/:id', requireOwner, async (req, res) => {
   const { rows: existingRows } = await pool.query(
     'SELECT * FROM products WHERE business_id = $1 AND id = $2',
     [req.businessId, req.params.id]
@@ -151,7 +157,7 @@ productsRouter.put('/:id', async (req, res) => {
   const existing = existingRows[0];
   if (!existing) return res.status(404).json({ error: 'Producto no encontrado' });
 
-  const { name, sku, category, price, cost, stock, minStock, unit, description, imageUrl } =
+  const { name, sku, category, price, cost, stock, minStock, unit, description, imageUrl, taxCategory } =
     req.body ?? {};
 
   try {
@@ -159,8 +165,8 @@ productsRouter.put('/:id', async (req, res) => {
       `UPDATE products SET
         name = $1, sku = $2, category = $3, price = $4, cost = $5,
         stock = $6, min_stock = $7, unit = $8, description = $9, image_url = $10,
-        updated_at = now()
-       WHERE business_id = $11 AND id = $12
+        tax_category = $11, updated_at = now()
+       WHERE business_id = $12 AND id = $13
        RETURNING *`,
       [
         name?.trim() || existing.name,
@@ -173,6 +179,7 @@ productsRouter.put('/:id', async (req, res) => {
         unit ?? existing.unit,
         description ?? existing.description,
         imageUrl ?? existing.image_url,
+        VALID_TAX_CATEGORIES.includes(taxCategory) ? taxCategory : existing.tax_category,
         req.businessId,
         req.params.id,
       ]
@@ -194,7 +201,7 @@ productsRouter.put('/:id', async (req, res) => {
   }
 });
 
-productsRouter.delete('/:id', async (req, res) => {
+productsRouter.delete('/:id', requireOwner, async (req, res) => {
   const { rows } = await pool.query(
     'DELETE FROM products WHERE business_id = $1 AND id = $2 RETURNING name',
     [req.businessId, req.params.id]

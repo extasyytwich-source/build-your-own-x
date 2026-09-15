@@ -240,6 +240,34 @@ export default function Reports() {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 }}
+            className="card mt-6 p-5"
+          >
+            <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <IconReceipt className="h-4 w-4 text-slate-500" />
+              Impuestos del mes
+            </h2>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-xs text-slate-400">Neto vendido</p>
+                <p className="mt-1 text-lg font-semibold text-slate-800">{currency(report.taxes.neto)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">IVA</p>
+                <p className="mt-1 text-lg font-semibold text-slate-800">{currency(report.taxes.iva)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400">Impuesto bebidas</p>
+                <p className="mt-1 text-lg font-semibold text-slate-800">
+                  {currency(report.taxes.impuestoAdicional)}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
             className="card mt-6 p-5"
           >

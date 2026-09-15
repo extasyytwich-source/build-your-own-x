@@ -9,7 +9,9 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
   const { login, signup, loginWithGoogle } = useAuth();
   const [mode, setMode] = useState(initialMode); // 'login' | 'signup'
   const [businessName, setBusinessName] = useState('');
-  const [email, setEmail] = useState('');
+  // En registro es siempre un correo (el dueño); en login puede ser el
+  // correo del dueño o el usuario de un empleado (ver auth.js del server).
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,8 +28,8 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
     setError('');
     setLoading(true);
     try {
-      if (mode === 'signup') await signup(businessName, email, password);
-      else await login(email, password);
+      if (mode === 'signup') await signup(businessName, identifier, password);
+      else await login(identifier, password);
     } catch (err) {
       setError(err.message);
       shake();
@@ -194,11 +196,11 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
             />
           )}
           <input
-            type="email"
+            type={mode === 'signup' ? 'email' : 'text'}
             required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Correo electrónico"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder={mode === 'signup' ? 'Correo electrónico' : 'Correo o usuario'}
             className="input"
           />
           <input

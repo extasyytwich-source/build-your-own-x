@@ -10,10 +10,12 @@ import ProductList from './components/ProductList.jsx';
 import MovementHistory from './components/MovementHistory.jsx';
 import Reports from './components/Reports.jsx';
 import Settings from './components/Settings.jsx';
+import Caja from './components/Caja.jsx';
 import LoadingSpinner from './components/LoadingSpinner.jsx';
 
 const VIEWS = {
   dashboard: { label: 'Panel', component: Dashboard },
+  caja: { label: 'Caja', component: Caja },
   products: { label: 'Productos', component: ProductList },
   history: { label: 'Historial', component: MovementHistory },
   reports: { label: 'Reportes', component: Reports },
@@ -21,7 +23,7 @@ const VIEWS = {
 };
 
 export default function App() {
-  const { isAuthenticated, subscriptionStatus, checkingSubscription } = useAuth();
+  const { isAuthenticated, role, subscriptionStatus, checkingSubscription } = useAuth();
   const [view, setView] = useState('dashboard');
   const [authView, setAuthView] = useState(null); // null (landing) | 'login' | 'signup'
 
@@ -40,6 +42,13 @@ export default function App() {
   }
   if (subscriptionStatus && subscriptionStatus !== 'activa' && subscriptionStatus !== 'atrasada') {
     return <Suscripcion />;
+  }
+
+  // Un empleado (cajero) solo ve la pantalla de venta, sin el resto del
+  // panel (productos, historial, reportes, ajustes, suscripción) — Caja
+  // trae su propia barra simple con "Salir", no pasa por el Sidebar.
+  if (role === 'cajero') {
+    return <Caja />;
   }
 
   const ActiveView = VIEWS[view].component;
