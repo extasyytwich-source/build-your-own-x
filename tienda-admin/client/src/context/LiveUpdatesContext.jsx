@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { CLIENT_ID, getToken } from '../api.js';
+import { CLIENT_ID } from '../api.js';
 import { useAuth } from './AuthContext.jsx';
 import { useToast } from './ToastContext.jsx';
 
@@ -33,10 +33,9 @@ export function LiveUpdatesProvider({ children }) {
       setConnected(false);
       return undefined;
     }
-    const token = getToken();
-    if (!token) return undefined;
-
-    const source = new EventSource(`/api/events/stream?token=${encodeURIComponent(token)}`);
+    // EventSource manda la cookie de sesión sola (mismo origen), no hace
+    // falta pasar ningún token por la URL.
+    const source = new EventSource('/api/events/stream', { withCredentials: true });
     source.onopen = () => setConnected(true);
     source.onerror = () => setConnected(false);
     source.addEventListener('change', (e) => {

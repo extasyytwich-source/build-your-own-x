@@ -1,67 +1,75 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { api, getToken, setToken } from '../api.js';
+import { api } from '../api.js';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [token, setTokenState] = useState(() => getToken());
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
-  const [checkingSubscription, setCheckingSubscription] = useState(() => Boolean(getToken()));
+  const [checkingSubscription, setCheckingSubscription] = useState(true);
 
-  // Al recargar la página con una sesión ya guardada, no sabemos todavía si
-  // la suscripción sigue activa hasta preguntarle al servidor. Mientras eso
-  // no responde, no hay que mostrar el panel ni la pantalla de suscripción.
+  // La sesión vive en una cookie httpOnly: este cliente no puede leerla, así
+  // que al cargar la página la única forma de saber si ya había una sesión
+  // es preguntarle al servidor (reaprovecha /billing/status, que de paso
+  // trae el estado de la suscripción).
   useEffect(() => {
-    if (!token) {
-      setCheckingSubscription(false);
-      return;
-    }
-    setCheckingSubscription(true);
     api
       .getBillingStatus()
-      .then((status) => setSubscriptionStatus(status.subscriptionStatus))
-      .catch(() => {})
+      .then((status) => {
+        setIsAuthenticated(true);
+        setSubscriptionStatus(status.subscriptionStatus);
+      })
+      .catch(() => {
+        setIsAuthenticated(false);
+        setSubscriptionStatus(null);
+      })
       .finally(() => setCheckingSubscription(false));
-  }, [token]);
+  }, []);
 
   const value = useMemo(
     () => ({
-      isAuthenticated: Boolean(token),
+      isAuthenticated,
       subscriptionStatus,
       checkingSubscription,
       async signup(businessName, email, password) {
-        const { token: newToken, subscriptionStatus: status } = await api.signup(
-          businessName,
-          email,
-          password
-        );
-        setToken(newToken);
-        setTokenState(newToken);
+        const { subscriptionStatus: status } = await api.signup(businessName, email, password);
+        setIsAuthenticated(true);
         setSubscriptionStatus(status);
       },
       async login(email, password) {
-        const { token: newToken, subscriptionStatus: status } = await api.login(email, password);
-        setToken(newToken);
-        setTokenState(newToken);
+        const { subscriptionStatus: status } = await api.login(email, password);
+        setIsAuthenticated(true);
         setSubscriptionStatus(status);
+      },
+      // Devuelve needsBusinessName cuando es una cuenta de Google nueva y
+      // todavía no sabemos el nombre del negocio (ver LoginGate.jsx).
+      async loginWithGoogle(credential, businessName) {
+        const result = await api.loginWithGoogle(credential, businessName);
+        if (result.needsBusinessName) return result;
+        setIsAuthenticated(true);
+        setSubscriptionStatus(result.subscriptionStatus);
+        return result;
       },
       async refreshSubscriptionStatus() {
         const status = await api.getBillingStatus();
         setSubscriptionStatus(status.subscriptionStatus);
         return status.subscriptionStatus;
       },
-      logout() {
-        setToken(null);
-        setTokenState(null);
+      async logout() {
+        try {
+          await api.logout();
+        } catch {
+          // Si falla el pedido igual cerramos la sesión del lado del cliente.
+        }
+        setIsAuthenticated(false);
         setSubscriptionStatus(null);
       },
       handleUnauthorized() {
-        setToken(null);
-        setTokenState(null);
+        setIsAuthenticated(false);
         setSubscriptionStatus(null);
       },
     }),
-    [token, subscriptionStatus, checkingSubscription]
+    [isAuthenticated, subscriptionStatus, checkingSubscription]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

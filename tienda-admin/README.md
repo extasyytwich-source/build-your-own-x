@@ -14,7 +14,8 @@ información de otra tienda. El acceso requiere una suscripción mensual de
 ## ¿Qué incluye?
 
 - **Cuenta propia por negocio**: registro con nombre del negocio, correo y
-  contraseña; sesión con JWT.
+  contraseña (o con **Iniciar sesión con Google**), sesión en una cookie
+  httpOnly.
 - **Suscripción de pago**: $20.000 CLP/mes vía Flow. Sin pago al día, el
   panel se bloquea (los datos nunca se borran).
 - **Panel general**: valor del inventario, productos con stock bajo y los
@@ -97,12 +98,27 @@ En otra terminal:
 
 ```bash
 cd tienda-admin/client
+cp .env.example .env   # opcional: VITE_GOOGLE_CLIENT_ID para el botón de Google
 npm install
 npm run dev
 ```
 
 Abre `http://localhost:5173`, crea una cuenta y activa la suscripción
 (modo desarrollo si no configuraste Flow todavía).
+
+### Iniciar sesión con Google (opcional)
+
+1. En [Google Cloud Console](https://console.cloud.google.com/) → **APIs &
+   Services → Credentials → Create Credentials → OAuth client ID → Web
+   application**.
+2. En **Authorized JavaScript origins** agrega `http://localhost:5173`
+   (desarrollo) y el dominio real cuando despliegues. No hace falta
+   configurar un "redirect URI" ni generar un client secret — el botón usa
+   verificación de ID token, no necesita ninguno de los dos.
+3. Copia el Client ID a **ambos** `.env`: `GOOGLE_CLIENT_ID` en
+   `server/.env` y `VITE_GOOGLE_CLIENT_ID` en `client/.env` (mismo valor).
+4. Sin esto configurado, el botón de Google simplemente no aparece — el
+   resto del panel funciona igual con correo y contraseña.
 
 ### Build de producción local
 
@@ -118,9 +134,20 @@ incluye Dockerfile listo para usar).
 
 ## Seguridad
 
-- Las contraseñas se guardan con hash (scrypt), nunca en texto plano.
-- Las sesiones son JWT firmados con `JWT_SECRET` — cámbialo por un valor
-  propio y secreto antes de usar la app con datos reales.
+- Las contraseñas se guardan con hash (scrypt), nunca en texto plano; una
+  cuenta creada con Google puede no tener contraseña hasta que decida
+  ponerse una.
+- La sesión es un JWT firmado con `JWT_SECRET`, guardado en una **cookie
+  httpOnly** (el navegador se la manda solo al servidor; JavaScript de la
+  página —propio o inyectado por un XSS— no puede leerla). En producción,
+  el servidor **rehúsa arrancar** si no configuraste `JWT_SECRET` en vez de
+  usar el valor de desarrollo por defecto.
+- **Iniciar sesión con Google**: el ID token se verifica contra las llaves
+  públicas de Google (`google-auth-library`) y contra nuestro propio
+  `GOOGLE_CLIENT_ID`. Si el correo ya tenía cuenta con contraseña, se
+  vincula automático (Google ya confirmó que ese correo es de esa persona).
+- `helmet` agrega los headers de seguridad estándar (CSP, no-sniff, etc.), y
+  `express-rate-limit` frena intentos repetidos de login/registro por IP.
 - Todos los datos de negocio (productos, movimientos, caja, reportes,
   eventos en tiempo real) están aislados por `business_id`: ninguna consulta
   cruza esa frontera.

@@ -3,9 +3,10 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useShake } from '../hooks/useShake.js';
 import { IconLock } from './icons.jsx';
+import GoogleSignInButton from './GoogleSignInButton.jsx';
 
 export default function LoginGate({ initialMode = 'login', onBack }) {
-  const { login, signup } = useAuth();
+  const { login, signup, loginWithGoogle } = useAuth();
   const [mode, setMode] = useState(initialMode); // 'login' | 'signup'
   const [businessName, setBusinessName] = useState('');
   const [email, setEmail] = useState('');
@@ -13,6 +14,12 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [shakeControls, shake] = useShake();
+
+  // Cuando Google confirma la identidad de alguien que nunca se registró
+  // acá, hace falta el nombre del negocio (Google no lo sabe) antes de
+  // poder crear la cuenta — el credential se reenvía junto con ese nombre.
+  const [pendingGoogleCredential, setPendingGoogleCredential] = useState(null);
+  const [googleBusinessName, setGoogleBusinessName] = useState('');
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -29,9 +36,88 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
     }
   }
 
+  async function handleGoogleCredential(credential) {
+    setError('');
+    setLoading(true);
+    try {
+      const result = await loginWithGoogle(credential);
+      if (result?.needsBusinessName) {
+        setPendingGoogleCredential(credential);
+      }
+    } catch (err) {
+      setError(err.message);
+      shake();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCompleteGoogleSignup(e) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await loginWithGoogle(pendingGoogleCredential, googleBusinessName);
+    } catch (err) {
+      setError(err.message);
+      shake();
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function switchMode(nextMode) {
     setMode(nextMode);
     setError('');
+  }
+
+  if (pendingGoogleCredential) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-800 via-zinc-950 to-black px-4">
+        <motion.form
+          onSubmit={handleCompleteGoogleSignup}
+          initial={{ opacity: 0, y: 24, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          className="w-full max-w-sm rounded-2xl bg-white/95 p-8 shadow-2xl backdrop-blur"
+        >
+          <h1 className="mb-1 text-center text-xl font-semibold text-slate-800">Ya casi</h1>
+          <p className="mb-6 text-center text-xs text-slate-500">
+            Google confirmó tu correo — ahora dinos el nombre de tu negocio.
+          </p>
+          <motion.div animate={shakeControls}>
+            <input
+              autoFocus
+              type="text"
+              required
+              value={googleBusinessName}
+              onChange={(e) => setGoogleBusinessName(e.target.value)}
+              placeholder="Nombre de tu negocio"
+              className="input"
+            />
+          </motion.div>
+          {error && (
+            <motion.p
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="mt-3 text-center text-sm text-rose-600"
+            >
+              {error}
+            </motion.p>
+          )}
+          <button type="submit" disabled={loading} className="btn-primary mt-4 w-full">
+            {loading ? 'Un momento…' : 'Crear cuenta'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setPendingGoogleCredential(null)}
+            className="mt-3 w-full text-center text-xs text-slate-400 hover:text-slate-600"
+          >
+            Cancelar
+          </button>
+        </motion.form>
+      </div>
+    );
   }
 
   return (
@@ -86,10 +172,19 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
           </button>
         </div>
 
+        <div className="mb-5">
+          <GoogleSignInButton onCredential={handleGoogleCredential} />
+        </div>
+
+        <div className="mb-5 flex items-center gap-3 text-xs text-slate-400">
+          <span className="h-px flex-1 bg-slate-200" />
+          o con tu correo
+          <span className="h-px flex-1 bg-slate-200" />
+        </div>
+
         <motion.div animate={shakeControls} className="space-y-3">
           {mode === 'signup' && (
             <input
-              autoFocus
               type="text"
               required
               value={businessName}
@@ -99,7 +194,6 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
             />
           )}
           <input
-            autoFocus={mode === 'login'}
             type="email"
             required
             value={email}

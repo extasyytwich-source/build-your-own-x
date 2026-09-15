@@ -39,9 +39,31 @@ En la sección **Environment** del servicio web, agrega:
 | `FLOW_SECRET_KEY` | tu llave secreta de Flow |
 | `FLOW_BASE_URL` | `https://sandbox.flow.cl/api` en pruebas, `https://www.flow.cl/api` en producción |
 | `ANTHROPIC_API_KEY` | opcional — cada negocio también puede pegar la suya propia desde Ajustes |
+| `GOOGLE_CLIENT_ID` | opcional — habilita "Iniciar sesión con Google" (ver más abajo) |
+| `VITE_GOOGLE_CLIENT_ID` | opcional — mismo valor que `GOOGLE_CLIENT_ID`, pero para el cliente (ver más abajo) |
 
 `PORT` no hace falta configurarlo: Render lo define solo y el servidor ya lo
 respeta (`process.env.PORT`).
+
+**Sobre Google Sign-In:** si ya lo configuraste en desarrollo (ver
+`README.md`), agrega el mismo Client ID acá, en **ambas** variables
+(`GOOGLE_CLIENT_ID` y `VITE_GOOGLE_CLIENT_ID` — el servidor y el cliente lo
+leen por separado). Además, en [Google Cloud
+Console](https://console.cloud.google.com/) → **APIs & Services →
+Credentials**, edita ese OAuth client y agrega el dominio real de producción
+(ej. `https://mostrador.onrender.com` o tu dominio propio) a **Authorized
+JavaScript origins** — si no, el botón de Google funciona en `localhost` pero
+falla en el sitio publicado.
+
+`VITE_GOOGLE_CLIENT_ID` es especial: Vite la incrusta en el bundle al
+**compilar** el cliente, no al arrancar el servidor, así que no basta con
+que quede seteada como variable de entorno del contenedor en ejecución. El
+`Dockerfile` ya está preparado para esto (recibe `VITE_GOOGLE_CLIENT_ID`
+como build arg); Render pasa automáticamente las variables de entorno del
+servicio como build args al construir la imagen Docker, así que con
+agregarla en la tabla de arriba alcanza — no hace falta ningún paso extra.
+Sin esta variable, el botón de Google simplemente no aparece — el resto de
+la app funciona igual.
 
 **Importante sobre Flow:** el código firma y llama a la API de Flow
 siguiendo su esquema de autenticación documentado (HMAC-SHA256), usando el

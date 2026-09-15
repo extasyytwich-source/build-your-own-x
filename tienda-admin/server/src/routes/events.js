@@ -1,19 +1,13 @@
 import { Router } from 'express';
-import { verifyToken } from '../auth.js';
+import { requireAuth } from '../auth.js';
 import { addSubscriber, removeSubscriber } from '../events.js';
 
 export const eventsRouter = Router();
 
-// EventSource (la API nativa del navegador para esto) no puede mandar un
-// header Authorization, así que aquí el token viaja como query param en vez
-// de por el middleware requireAuth normal.
-eventsRouter.get('/stream', (req, res) => {
-  const token = req.query.token;
-  const payload = token ? verifyToken(String(token)) : null;
-  if (!payload) {
-    return res.status(401).json({ error: 'No autorizado' });
-  }
-
+// EventSource (la API nativa del navegador para esto) no puede mandar
+// headers propios, pero sí manda cookies en pedidos del mismo origen, así
+// que la cookie de sesión de siempre alcanza acá también.
+eventsRouter.get('/stream', requireAuth, (req, res) => {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -22,7 +16,7 @@ eventsRouter.get('/stream', (req, res) => {
   });
   res.write(': conectado\n\n');
 
-  addSubscriber(res, payload.businessId);
+  addSubscriber(res, req.businessId);
 
   // Mantiene la conexión viva a través de proxies/timeouts intermedios.
   const keepAlive = setInterval(() => res.write(': ping\n\n'), 25000);

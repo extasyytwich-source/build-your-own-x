@@ -1,41 +1,30 @@
-const TOKEN_KEY = 'tienda_admin_token';
-
 // Identifica esta pestaña/dispositivo frente a las demás conectadas al mismo
 // panel (la caja, el teléfono, etc.), para que las actualizaciones en tiempo
 // real no le muestren a cada quien un aviso de su propia acción.
 export const CLIENT_ID =
   (typeof crypto !== 'undefined' && crypto.randomUUID?.()) || Math.random().toString(36).slice(2);
 
-export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function setToken(token) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
-}
-
-async function request(path, { method = 'GET', body, auth = true } = {}) {
+// La sesión vive en una cookie httpOnly que pone el servidor — este cliente
+// nunca la lee ni la guarda (por diseño: así un XSS no podría robarla leyendo
+// localStorage). "credentials: include" es lo que hace que el navegador la
+// mande sola en cada pedido.
+async function request(path, { method = 'GET', body } = {}) {
   const headers = { 'Content-Type': 'application/json', 'X-Client-Id': CLIENT_ID };
-  if (auth) {
-    const token = getToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
 
   const res = await fetch(`/api${path}`, {
     method,
     headers,
+    credentials: 'include',
     body: body ? JSON.stringify(body) : undefined,
   });
 
   const data = await res.json().catch(() => ({}));
 
   // 'No autorizado' es lo único que devuelve el middleware de sesión
-  // (requireAuth) cuando el token falta o expiró. Otros 401 (contraseña
+  // (requireAuth) cuando la cookie falta o expiró. Otros 401 (contraseña
   // incorrecta al iniciar sesión o al cambiarla) traen su propio mensaje y
   // no deben tratarse como sesión vencida.
   if (res.status === 401 && data.error === 'No autorizado') {
-    setToken(null);
     const err = new Error('Sesión expirada, vuelve a iniciar sesión');
     err.status = 401;
     throw err;
@@ -56,9 +45,12 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
 
 export const api = {
   signup: (businessName, email, password) =>
-    request('/auth/signup', { method: 'POST', body: { businessName, email, password }, auth: false }),
-  login: (email, password) =>
-    request('/auth/login', { method: 'POST', body: { email, password }, auth: false }),
+    request('/auth/signup', { method: 'POST', body: { businessName, email, password } }),
+  login: (email, password) => request('/auth/login', { method: 'POST', body: { email, password } }),
+  loginWithGoogle: (credential, businessName) =>
+    request('/auth/google', { method: 'POST', body: { credential, businessName } }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  getMe: () => request('/auth/me'),
   changePassword: (currentPassword, newPassword) =>
     request('/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } }),
 
@@ -121,10 +113,7 @@ function todayStamp() {
 }
 
 async function fetchAsBlob(path) {
-  const token = getToken();
-  const res = await fetch(`/api${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
+  const res = await fetch(`/api${path}`, { credentials: 'include' });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || 'No se pudo descargar el archivo');

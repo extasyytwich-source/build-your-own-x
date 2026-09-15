@@ -4,6 +4,12 @@ WORKDIR /app/client
 COPY client/package*.json ./
 RUN npm ci
 COPY client/ ./
+# Vite incrusta las variables VITE_* en el bundle en tiempo de build, no de
+# arranque — hay que recibirlas como build arg (Render las pasa solas si
+# están seteadas como variable de entorno del servicio) y exponerlas al
+# proceso de "npm run build".
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 RUN npm run build
 
 # Instala las dependencias del servidor (solo producción)

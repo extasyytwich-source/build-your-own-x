@@ -37,6 +37,7 @@ export default function Settings() {
   const fileInputRef = useRef(null);
 
   const [qrDataUrl, setQrDataUrl] = useState(null);
+  const [hasPassword, setHasPassword] = useState(true);
   const { notify } = useToast();
 
   const panelUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -44,6 +45,7 @@ export default function Settings() {
   useEffect(() => {
     api.getAiSettings().then(setAiStatus).catch(() => {});
     api.getBillingStatus().then(setBilling).catch(() => {});
+    api.getMe().then((me) => setHasPassword(me.hasPassword)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -66,11 +68,12 @@ export default function Settings() {
     }
     setSaving(true);
     try {
-      await api.changePassword(currentPassword, newPassword);
-      notify('Contraseña actualizada correctamente');
+      await api.changePassword(hasPassword ? currentPassword : undefined, newPassword);
+      notify(hasPassword ? 'Contraseña actualizada correctamente' : 'Contraseña creada correctamente');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setHasPassword(true);
     } catch (err) {
       notify(err.message, 'error');
     } finally {
@@ -201,17 +204,27 @@ export default function Settings() {
         onSubmit={handleSubmit}
         className="card mt-6 max-w-sm space-y-4 p-6"
       >
-        <h2 className="text-sm font-semibold text-slate-700">Cambiar contraseña</h2>
-        <div>
-          <label className="label">Contraseña actual</label>
-          <input
-            required
-            type="password"
-            className="input"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-          />
-        </div>
+        <h2 className="text-sm font-semibold text-slate-700">
+          {hasPassword ? 'Cambiar contraseña' : 'Poner una contraseña'}
+        </h2>
+        {!hasPassword && (
+          <p className="-mt-2 text-xs text-slate-500">
+            Tu cuenta entra con Google. Puedes poner una contraseña además, por si algún día
+            quieres entrar sin pasar por Google.
+          </p>
+        )}
+        {hasPassword && (
+          <div>
+            <label className="label">Contraseña actual</label>
+            <input
+              required
+              type="password"
+              className="input"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+            />
+          </div>
+        )}
         <div>
           <label className="label">Nueva contraseña</label>
           <input

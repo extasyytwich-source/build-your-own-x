@@ -1,6 +1,9 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -24,10 +27,46 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');
 const hasClientBuild = fs.existsSync(path.join(clientDist, 'index.html'));
 
+// Frena fuerza bruta / credential stuffing contra login, registro y
+// cambio de contraseña: un mismo IP no puede reintentar sin límite.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.' },
+});
+
 export function createApp() {
   const app = express();
+  // Necesario detrás del proxy de Render (u otro hosting) para que la IP
+  // real llegue al rate limiter y para que Express sepa que la conexión
+  // original es HTTPS (importante para la cookie "secure").
+  app.set('trust proxy', 1);
+
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+          // El botón de "Iniciar sesión con Google" carga su script y su
+          // iframe/popup desde accounts.google.com; sin esto, la política
+          // por defecto de helmet lo bloquearía.
+          'script-src': ["'self'", 'https://accounts.google.com'],
+          'frame-src': ["'self'", 'https://accounts.google.com'],
+          'connect-src': ["'self'", 'https://accounts.google.com'],
+        },
+      },
+    })
+  );
+
   const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
-  if (!hasClientBuild) app.use(cors({ origin: clientOrigin }));
+  // credentials:true porque la sesión ahora viaja en una cookie: sin esto
+  // el navegador no la manda ni la deja setear en pedidos cross-origin
+  // (el caso del cliente de desarrollo, en otro puerto que la API).
+  if (!hasClientBuild) app.use(cors({ origin: clientOrigin, credentials: true }));
+
+  app.use(cookieParser());
 
   // El webhook de Flow necesita el cuerpo crudo (sin parsear) para poder
   // verificar la firma, así que se monta antes que express.json().
@@ -47,10 +86,8 @@ export function createApp() {
 
   app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-  app.use('/api/auth', authRouter);
+  app.use('/api/auth', authLimiter, authRouter);
   app.use('/api/billing', billingRouter);
-  // Sin requireAuth: EventSource no puede mandar el header Authorization,
-  // así que el token se valida a mano dentro de este router (por query param).
   app.use('/api/events', eventsRouter);
   app.use('/api/products', requireAuth, requireActiveSubscription, productsRouter);
   app.use('/api/movements', requireAuth, requireActiveSubscription, movementsRouter);
