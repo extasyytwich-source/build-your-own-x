@@ -33,6 +33,15 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
   const [loading, setLoading] = useState(false);
   const [shakeControls, shake] = useShake();
 
+  // "¿Olvidaste tu contraseña?" solo aplica al dueño (el empleado entra con
+  // usuario, sin correo real que recibir un enlace). null = no se está
+  // mostrando; 'form' = pidiendo el correo; 'sent' = ya se envió (o no —
+  // el mensaje es el mismo a propósito, ver routes/auth.js).
+  const [forgotStep, setForgotStep] = useState(null);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState('');
+
   // Cuando Google confirma la identidad de alguien que nunca se registró
   // acá, hace falta el nombre del negocio (Google no lo sabe) antes de
   // poder crear la cuenta — el credential se reenvía junto con ese nombre.
@@ -65,6 +74,22 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
       shake();
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleForgotSubmit(e) {
+    e.preventDefault();
+    setForgotError('');
+    setForgotLoading(true);
+    try {
+      const { message } = await api.forgotPassword(forgotEmail);
+      setForgotStep('sent');
+      setError('');
+      setForgotError(message);
+    } catch (err) {
+      setForgotError(err.message);
+    } finally {
+      setForgotLoading(false);
     }
   }
 
@@ -412,6 +437,76 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
     );
   }
 
+  if (forgotStep) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-800 via-zinc-950 to-black px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 24, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          className="w-full max-w-sm rounded-2xl bg-white/95 p-8 shadow-2xl backdrop-blur"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.15, type: 'spring', stiffness: 200 }}
+            className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500 text-white shadow-soft"
+          >
+            <IconLock className="h-6 w-6" />
+          </motion.div>
+
+          {forgotStep === 'sent' ? (
+            <>
+              <h1 className="mb-1 text-center text-xl font-semibold text-slate-800">Revisa tu correo</h1>
+              <p className="mb-6 text-center text-xs text-slate-500">{forgotError}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotStep(null);
+                  setForgotEmail('');
+                  setForgotError('');
+                }}
+                className="btn-primary w-full"
+              >
+                Volver a iniciar sesión
+              </button>
+            </>
+          ) : (
+            <form onSubmit={handleForgotSubmit}>
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotStep(null);
+                  setForgotError('');
+                }}
+                className="mb-3 text-xs font-medium text-slate-400 hover:text-slate-600"
+              >
+                ← Volver
+              </button>
+              <h1 className="mb-1 text-center text-xl font-semibold text-slate-800">Recuperar contraseña</h1>
+              <p className="mb-6 text-center text-xs text-slate-500">
+                Te mandamos un enlace a tu correo para elegir una nueva.
+              </p>
+              <input
+                autoFocus
+                type="email"
+                required
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                placeholder="Correo electrónico"
+                className="input"
+              />
+              {forgotError && <p className="mt-3 text-center text-sm text-rose-600">{forgotError}</p>}
+              <button type="submit" disabled={forgotLoading} className="btn-primary mt-4 w-full">
+                {forgotLoading ? 'Enviando…' : 'Enviar enlace'}
+              </button>
+            </form>
+          )}
+        </motion.div>
+      </div>
+    );
+  }
+
   if (pendingGoogleCredential) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-800 via-zinc-950 to-black px-4">
@@ -545,6 +640,20 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
         <button type="submit" disabled={loading} className="btn-primary mt-4 w-full">
           {loading ? 'Un momento…' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}
         </button>
+
+        {mode === 'login' && (
+          <button
+            type="button"
+            onClick={() => {
+              setForgotEmail(identifier.includes('@') ? identifier : '');
+              setForgotStep('form');
+              setError('');
+            }}
+            className="mt-3 w-full text-center text-xs text-slate-400 hover:text-slate-600"
+          >
+            ¿Olvidaste tu contraseña?
+          </button>
+        )}
 
         {mode === 'signup' && (
           <p className="mt-3 text-center text-xs text-slate-400">
