@@ -35,6 +35,37 @@ function effectiveSubscriptionStatus(row) {
   return row.subscription_exempt ? 'activa' : row.subscription_status;
 }
 
+// Código corto que identifica a la tienda (ver migración 0010): el login
+// manual de un empleado lo pide junto a su usuario, para que ese usuario
+// solo necesite ser único dentro de su propia tienda, no en toda la
+// plataforma. Alfabeto sin caracteres fáciles de confundir (0/O, 1/I/L).
+const STORE_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+function generateStoreCode() {
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += STORE_CODE_ALPHABET[crypto.randomInt(STORE_CODE_ALPHABET.length)];
+  }
+  return code;
+}
+
+// Reintenta ante la (muy improbable) colisión de un código ya existente, en
+// vez de dejar que INSERT falle por la restricción UNIQUE.
+async function insertBusiness(client, name) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const { rows } = await client.query(
+        'INSERT INTO businesses (name, store_code) VALUES ($1, $2) RETURNING id',
+        [name.trim(), generateStoreCode()]
+      );
+      return rows[0].id;
+    } catch (err) {
+      if (err.code === '23505' && attempt < 4) continue;
+      throw err;
+    }
+  }
+}
+
 // Crea el negocio y su primer usuario (el dueño) en una sola transacción.
 export async function createBusiness(businessName, email, password) {
   const normalizedEmail = email.toLowerCase().trim();
@@ -48,11 +79,7 @@ export async function createBusiness(businessName, email, password) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const businessResult = await client.query(
-      'INSERT INTO businesses (name) VALUES ($1) RETURNING id',
-      [businessName.trim()]
-    );
-    const businessId = businessResult.rows[0].id;
+    const businessId = await insertBusiness(client, businessName);
 
     const salt = crypto.randomBytes(16).toString('hex');
     const passwordHash = hashPassword(password, salt);
@@ -77,30 +104,31 @@ export async function createBusiness(businessName, email, password) {
   }
 }
 
-// El dueño entra con su correo; un empleado (rol 'cajero') entra con el
-// usuario que le puso el dueño al crearlo — un mismo campo de login acepta
-// cualquiera de los dos.
-export async function verifyCredentials(identifier, password) {
-  const normalized = String(identifier).toLowerCase().trim();
+function checkPasswordHash(password, user) {
+  // Sin password_hash es una cuenta creada con Google que nunca puso
+  // contraseña: no hay nada que comparar, el login por contraseña falla
+  // igual que si el correo no existiera (no delatamos cómo se creó la cuenta).
+  if (!user || !user.password_hash) return false;
+  const candidate = hashPassword(password, user.password_salt);
+  const a = Buffer.from(candidate, 'hex');
+  const b = Buffer.from(user.password_hash, 'hex');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+// El dueño entra con su correo, único en toda la plataforma.
+export async function verifyCredentials(email, password) {
+  const normalized = String(email).toLowerCase().trim();
   const { rows } = await pool.query(
     `SELECT users.id AS user_id, users.password_hash, users.password_salt, users.business_id,
             users.role, users.name,
             businesses.subscription_status, businesses.subscription_exempt
      FROM users
      JOIN businesses ON businesses.id = users.business_id
-     WHERE users.email = $1 OR users.username = $1`,
+     WHERE users.email = $1`,
     [normalized]
   );
   const user = rows[0];
-  // Sin password_hash es una cuenta creada con Google que nunca puso
-  // contraseña: no hay nada que comparar, el login por contraseña falla
-  // igual que si el correo no existiera (no delatamos cómo se creó la cuenta).
-  if (!user || !user.password_hash) return null;
-
-  const candidate = hashPassword(password, user.password_salt);
-  const a = Buffer.from(candidate, 'hex');
-  const b = Buffer.from(user.password_hash, 'hex');
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  if (!checkPasswordHash(password, user)) return null;
 
   return {
     userId: user.user_id,
@@ -109,6 +137,46 @@ export async function verifyCredentials(identifier, password) {
     name: user.name,
     subscriptionStatus: effectiveSubscriptionStatus(user),
   };
+}
+
+// Un empleado (rol 'cajero') entra con el usuario que le puso el dueño al
+// crearlo — pero ese usuario solo es único dentro de su propia tienda (ver
+// migración 0010), así que hace falta también el código de tienda para
+// saber a cuál negocio pertenece.
+export async function verifyEmployeeCredentials(storeCode, username, password) {
+  const normalizedCode = String(storeCode).toUpperCase().trim();
+  const normalizedUsername = String(username).toLowerCase().trim();
+  const { rows } = await pool.query(
+    `SELECT users.id AS user_id, users.password_hash, users.password_salt, users.business_id,
+            users.role, users.name,
+            businesses.subscription_status, businesses.subscription_exempt
+     FROM users
+     JOIN businesses ON businesses.id = users.business_id
+     WHERE businesses.store_code = $1 AND users.username = $2`,
+    [normalizedCode, normalizedUsername]
+  );
+  const user = rows[0];
+  if (!checkPasswordHash(password, user)) return null;
+
+  return {
+    userId: user.user_id,
+    businessId: user.business_id,
+    role: user.role,
+    name: user.name,
+    subscriptionStatus: effectiveSubscriptionStatus(user),
+  };
+}
+
+// Reverifica la contraseña de una sesión ya autenticada (cambio de
+// contraseña) directo por su id — evita depender de un correo/usuario que,
+// tras separar el usuario por tienda, ya no alcanza para identificar una
+// única fila.
+export async function verifyPasswordForUser(userId, password) {
+  const { rows } = await pool.query(
+    'SELECT password_hash, password_salt FROM users WHERE id = $1',
+    [userId]
+  );
+  return checkPasswordHash(password, rows[0]);
 }
 
 // El dueño registra al empleado desde Ajustes (no hay autoregistro): entra
@@ -126,7 +194,7 @@ export async function createEmployee(businessId, { name, username, password }) {
     return rows[0];
   } catch (err) {
     if (err.code === '23505') {
-      const e = new Error('Ya existe una cuenta con ese usuario');
+      const e = new Error('Ya existe un empleado con ese usuario en esta tienda');
       e.status = 409;
       throw e;
     }
@@ -312,11 +380,7 @@ export async function findOrCreateGoogleUser({ googleId, email, businessName }) 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const businessResult = await client.query(
-      'INSERT INTO businesses (name) VALUES ($1) RETURNING id',
-      [businessName.trim()]
-    );
-    const businessId = businessResult.rows[0].id;
+    const businessId = await insertBusiness(client, businessName);
     const userResult = await client.query(
       `INSERT INTO users (business_id, email, google_id, role) VALUES ($1, $2, $3, 'owner') RETURNING id`,
       [businessId, email, googleId]
