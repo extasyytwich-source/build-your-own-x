@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from './context/AuthContext.jsx';
 import Landing from './components/Landing.jsx';
@@ -23,9 +23,19 @@ const VIEWS = {
 };
 
 export default function App() {
-  const { isAuthenticated, role, subscriptionStatus, checkingSubscription } = useAuth();
+  const { isAuthenticated, role, subscriptionStatus, checkingSubscription, justCompletedSignup, logout } =
+    useAuth();
   const [view, setView] = useState('dashboard');
   const [authView, setAuthView] = useState(null); // null (landing) | 'login' | 'signup'
+
+  // Recién registró su negocio y terminó de pagar: en vez de entrar directo
+  // al panel, cierra la sesión y vuelve al selector "soy dueño o empleado"
+  // — entra ahí como cualquier otro, con las credenciales que acaba de crear.
+  useEffect(() => {
+    if (isAuthenticated && justCompletedSignup && subscriptionStatus === 'activa') {
+      logout().then(() => setAuthView('login'));
+    }
+  }, [isAuthenticated, justCompletedSignup, subscriptionStatus, logout]);
 
   if (!isAuthenticated) {
     if (!authView) {
@@ -33,7 +43,7 @@ export default function App() {
     }
     return <LoginGate initialMode={authView} onBack={() => setAuthView(null)} />;
   }
-  if (checkingSubscription) {
+  if (checkingSubscription || (justCompletedSignup && subscriptionStatus === 'activa')) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <LoadingSpinner />
