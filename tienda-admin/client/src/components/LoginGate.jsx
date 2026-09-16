@@ -127,11 +127,6 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
     }
   }
 
-  function switchMode(nextMode) {
-    setMode(nextMode);
-    setError('');
-  }
-
   // Si se llegó directo a "Crear cuenta" desde la landing, nunca se mostró
   // el selector de dueño/empleado — Volver debe salir a la landing. Si en
   // cambio se llegó eligiendo "Soy el dueño" (o su enlace de "Crear
@@ -496,27 +491,6 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
         <p className="mb-6 text-center text-xs text-slate-500">
           {mode === 'login' ? 'Ingresa a tu panel' : 'Crea la cuenta de tu negocio'}
         </p>
-
-        <div className="mb-5 flex rounded-xl bg-slate-100 p-1 text-sm font-medium">
-          <button
-            type="button"
-            onClick={() => switchMode('login')}
-            className={`flex-1 rounded-lg py-1.5 transition ${
-              mode === 'login' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'
-            }`}
-          >
-            Iniciar sesión
-          </button>
-          <button
-            type="button"
-            onClick={() => switchMode('signup')}
-            className={`flex-1 rounded-lg py-1.5 transition ${
-              mode === 'signup' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'
-            }`}
-          >
-            Crear cuenta
-          </button>
-        </div>
 
         <div className="mb-5">
           <GoogleSignInButton onCredential={handleGoogleCredential} />
