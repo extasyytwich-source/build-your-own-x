@@ -86,6 +86,7 @@ refundsRouter.post('/', async (req, res) => {
           unitPriceOverride: Number(movement.unit_price),
           refundId,
           refundedFromId: movement.id,
+          locationId: movement.location_id,
         }
       );
       total += Number(movement.unit_price) * Number(movement.quantity);

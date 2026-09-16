@@ -63,7 +63,7 @@ function resolveDiscountAmount(baseAmount, discount) {
 // movimiento es el precio neto realmente cobrado — sin eso, los reportes de
 // IVA/ganancia (que leen unit_price de movements) no necesitan tocarse.
 salesRouter.post('/', async (req, res) => {
-  const { items, paymentMethod, amountReceived, discount } = req.body ?? {};
+  const { items, paymentMethod, amountReceived, discount, locationId } = req.body ?? {};
 
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'El carrito está vacío' });
@@ -126,7 +126,7 @@ salesRouter.post('/', async (req, res) => {
         'salida',
         Number(item.quantity),
         null,
-        { saleId, unitPriceOverride: finalUnitPrice }
+        { saleId, unitPriceOverride: finalUnitPrice, locationId }
       );
       total += Number(movement.unit_price) * Number(movement.quantity);
       totalCost += Number(movement.unit_cost) * Number(movement.quantity);

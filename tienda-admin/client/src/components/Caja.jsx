@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -46,7 +46,39 @@ export default function Caja() {
   const [totalDiscountOpen, setTotalDiscountOpen] = useState(false);
   const [totalDiscountType, setTotalDiscountType] = useState('percent');
   const [totalDiscountValue, setTotalDiscountValue] = useState('');
+  const [locations, setLocations] = useState([]);
+  const [activeLocationId, setActiveLocationId] = useState(() => {
+    try {
+      return localStorage.getItem('mostrador_active_location') || '';
+    } catch {
+      return '';
+    }
+  });
   const searchTimeout = useRef(null);
+
+  useEffect(() => {
+    api
+      .getLocations()
+      .then((data) => {
+        setLocations(data);
+        setActiveLocationId((current) => {
+          if (current && data.some((l) => String(l.id) === current)) return current;
+          const fallback = data.find((l) => l.isDefault) || data[0];
+          return fallback ? String(fallback.id) : '';
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  function handleChangeLocation(id) {
+    setActiveLocationId(id);
+    try {
+      localStorage.setItem('mostrador_active_location', id);
+    } catch {
+      // localStorage puede fallar (privado/bloqueado) — no es crítico, se
+      // vuelve a preguntar la próxima vez que abra Caja.
+    }
+  }
 
   // Descuento de una línea, ya resuelto a un monto en pesos (sin pasarse
   // del subtotal de esa línea) — mismo cálculo que hace el backend, para
@@ -163,6 +195,7 @@ export default function Caja() {
         amountReceived: paymentMethod === 'efectivo' ? amountReceivedNumber : undefined,
         discount:
           Number(totalDiscountValue) > 0 ? { type: totalDiscountType, value: Number(totalDiscountValue) } : undefined,
+        locationId: activeLocationId ? Number(activeLocationId) : undefined,
       });
       setLastSale(result);
       setCart([]);
@@ -191,6 +224,20 @@ export default function Caja() {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          {locations.length > 1 && (
+            <select
+              value={activeLocationId}
+              onChange={(e) => handleChangeLocation(e.target.value)}
+              className="input py-1.5 text-xs sm:text-sm"
+              aria-label="Sucursal activa"
+            >
+              {locations.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          )}
           <span
             className={`flex items-center gap-1.5 text-xs font-medium ${
               connected ? 'text-emerald-600' : 'text-slate-400'

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import Modal from './Modal.jsx';
 import SelectableOption from './SelectableOption.jsx';
 import { useShake } from '../hooks/useShake.js';
+import { api } from '../api.js';
 import { IconMinusCircle, IconPlusCircle, IconWrench } from './icons.jsx';
 
 const TYPES = [
@@ -18,6 +19,8 @@ export default function MovementModal({ open, onClose, onSubmit, product }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [shakeControls, shake] = useShake();
+  const [locationStocks, setLocationStocks] = useState([]);
+  const [locationId, setLocationId] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -25,15 +28,35 @@ export default function MovementModal({ open, onClose, onSubmit, product }) {
       setQuantity('');
       setNote('');
       setError('');
+      setLocationStocks([]);
+      setLocationId('');
     }
   }, [open]);
+
+  useEffect(() => {
+    if (open && product) {
+      api
+        .getProductStock(product.id)
+        .then((rows) => {
+          setLocationStocks(rows);
+          if (rows.length > 0) setLocationId(String(rows[0].locationId));
+        })
+        .catch(() => {});
+    }
+  }, [open, product]);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
     setSaving(true);
     try {
-      await onSubmit({ productId: product.id, type, quantity: Number(quantity), note });
+      await onSubmit({
+        productId: product.id,
+        type,
+        quantity: Number(quantity),
+        note,
+        locationId: locationId ? Number(locationId) : undefined,
+      });
     } catch (err) {
       setError(err.message);
       shake();
@@ -44,9 +67,24 @@ export default function MovementModal({ open, onClose, onSubmit, product }) {
 
   if (!product) return null;
 
+  const currentLocationStock = locationStocks.find((l) => String(l.locationId) === locationId);
+
   return (
     <Modal open={open} onClose={onClose} title={`Registrar movimiento — ${product.name}`}>
       <motion.form animate={shakeControls} onSubmit={handleSubmit} className="space-y-4">
+        {locationStocks.length > 1 && (
+          <div>
+            <label className="label">Sucursal</label>
+            <select className="input" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+              {locationStocks.map((l) => (
+                <option key={l.locationId} value={l.locationId}>
+                  {l.locationName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div>
           <label className="label">Tipo de movimiento</label>
           <div className="flex flex-col gap-2">
@@ -78,7 +116,8 @@ export default function MovementModal({ open, onClose, onSubmit, product }) {
             onChange={(e) => setQuantity(e.target.value)}
           />
           <p className="mt-1 text-xs text-slate-400">
-            Stock actual: {product.stock} {product.unit}
+            Stock actual{locationStocks.length > 1 ? ' en esta sucursal' : ''}:{' '}
+            {currentLocationStock ? currentLocationStock.stock : product.stock} {product.unit}
           </p>
         </div>
 
