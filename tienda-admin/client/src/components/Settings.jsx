@@ -61,6 +61,7 @@ export default function Settings() {
   const [qrEmployee, setQrEmployee] = useState(null);
   const [qrImage, setQrImage] = useState(null);
   const [generatingQr, setGeneratingQr] = useState(false);
+  const [storeCode, setStoreCode] = useState(null);
 
   const [telegramStatus, setTelegramStatus] = useState(null);
   const [telegramConnecting, setTelegramConnecting] = useState(false);
@@ -82,7 +83,10 @@ export default function Settings() {
   useEffect(() => {
     api.getAiSettings().then(setAiStatus).catch(() => {});
     api.getBillingStatus().then(setBilling).catch(() => {});
-    api.getMe().then((me) => setHasPassword(me.hasPassword)).catch(() => {});
+    api.getMe().then((me) => {
+      setHasPassword(me.hasPassword);
+      setStoreCode(me.storeCode);
+    }).catch(() => {});
     loadEmployees();
     loadTelegramStatus();
     return () => clearInterval(pollRef.current);
@@ -403,6 +407,15 @@ export default function Settings() {
           (ícono junto a su nombre), directo a la pantalla de Caja — no ve productos, historial,
           reportes ni ajustes.
         </p>
+
+        {storeCode && (
+          <div className="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
+            <span className="text-slate-600">
+              Código de tienda <span className="text-xs text-slate-400">(para el login manual)</span>
+            </span>
+            <span className="font-mono font-semibold tracking-wide text-slate-800">{storeCode}</span>
+          </div>
+        )}
 
         {employees.length > 0 && (
           <ul className="mb-4 space-y-1.5">

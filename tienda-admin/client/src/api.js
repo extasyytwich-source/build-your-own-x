@@ -47,6 +47,8 @@ export const api = {
   signup: (businessName, email, password) =>
     request('/auth/signup', { method: 'POST', body: { businessName, email, password } }),
   login: (identifier, password) => request('/auth/login', { method: 'POST', body: { identifier, password } }),
+  loginEmployee: (storeCode, username, password) =>
+    request('/auth/employee-login', { method: 'POST', body: { storeCode, username, password } }),
   loginWithQr: (token) => request('/auth/qr-login', { method: 'POST', body: { token } }),
   loginWithGoogle: (credential, businessName) =>
     request('/auth/google', { method: 'POST', body: { credential, businessName } }),

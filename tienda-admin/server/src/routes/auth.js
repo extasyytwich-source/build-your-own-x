@@ -3,6 +3,8 @@ import { pool } from '../db.js';
 import {
   createBusiness,
   verifyCredentials,
+  verifyEmployeeCredentials,
+  verifyPasswordForUser,
   updatePassword,
   hasPassword,
   issueToken,
@@ -41,17 +43,35 @@ authRouter.post('/signup', async (req, res) => {
   }
 });
 
-// "identifier" es el correo del dueño o el usuario de un empleado — un
-// mismo campo de login sirve para ambos (ver auth.js: verifyCredentials).
+// Login del dueño, por su correo (único en toda la plataforma).
 authRouter.post('/login', async (req, res) => {
   const { identifier, password } = req.body ?? {};
   if (!identifier || !password) {
-    return res.status(400).json({ error: 'Falta el correo/usuario o la contraseña' });
+    return res.status(400).json({ error: 'Falta el correo o la contraseña' });
   }
 
   const result = await verifyCredentials(identifier, password);
   if (!result) {
-    return res.status(401).json({ error: 'Correo/usuario o contraseña incorrectos' });
+    return res.status(401).json({ error: 'Correo o contraseña incorrectos' });
+  }
+
+  const token = issueToken({ userId: result.userId, businessId: result.businessId, role: result.role });
+  setSessionCookie(res, token);
+  res.json({ subscriptionStatus: result.subscriptionStatus, role: result.role, name: result.name });
+});
+
+// Login manual de un empleado: el usuario que le puso el dueño solo es
+// único dentro de su propia tienda (ver migración 0010), así que hace
+// falta también el código de tienda que el dueño ve en Ajustes.
+authRouter.post('/employee-login', async (req, res) => {
+  const { storeCode, username, password } = req.body ?? {};
+  if (!storeCode || !username || !password) {
+    return res.status(400).json({ error: 'Falta el código de tienda, el usuario o la contraseña' });
+  }
+
+  const result = await verifyEmployeeCredentials(storeCode, username, password);
+  if (!result) {
+    return res.status(401).json({ error: 'Código de tienda, usuario o contraseña incorrectos' });
   }
 
   const token = issueToken({ userId: result.userId, businessId: result.businessId, role: result.role });
@@ -117,15 +137,19 @@ authRouter.post('/logout', requireAuth, (req, res) => {
 // cuenta creada con Google puede no tener ninguna todavía) y por el
 // frontend para decidir qué pantalla mostrar según el rol.
 authRouter.get('/me', requireAuth, async (req, res) => {
-  const { rows } = await pool.query('SELECT email, username, name, role FROM users WHERE id = $1', [
-    req.userId,
-  ]);
+  const { rows } = await pool.query(
+    `SELECT users.email, users.username, users.name, users.role, businesses.store_code
+     FROM users JOIN businesses ON businesses.id = users.business_id
+     WHERE users.id = $1`,
+    [req.userId]
+  );
   const user = rows[0];
   res.json({
     email: user?.email ?? null,
     username: user?.username ?? null,
     name: user?.name ?? null,
     role: user?.role ?? null,
+    storeCode: user?.store_code ?? null,
     hasPassword: await hasPassword(req.userId),
   });
 });
@@ -144,9 +168,7 @@ authRouter.post('/change-password', requireAuth, async (req, res) => {
     if (!currentPassword) {
       return res.status(400).json({ error: 'Falta la contraseña actual' });
     }
-    const { rows } = await pool.query('SELECT email, username FROM users WHERE id = $1', [req.userId]);
-    const identifier = rows[0]?.email || rows[0]?.username;
-    const valid = identifier && (await verifyCredentials(identifier, currentPassword));
+    const valid = await verifyPasswordForUser(req.userId, currentPassword);
     if (!valid) {
       return res.status(401).json({ error: 'La contraseña actual no es correcta' });
     }

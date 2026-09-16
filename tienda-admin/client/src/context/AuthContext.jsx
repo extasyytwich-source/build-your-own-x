@@ -56,6 +56,17 @@ export function AuthProvider({ children }) {
         setName(result.name ?? null);
         setSubscriptionStatus(result.subscriptionStatus);
       },
+      // Login manual de un empleado: usuario+contraseña solo son únicos
+      // dentro de su tienda, así que hace falta también el código de tienda
+      // (ver LoginGate.jsx y Settings.jsx, donde el dueño lo ve para
+      // compartirlo).
+      async loginEmployee(storeCode, username, password) {
+        const result = await api.loginEmployee(storeCode, username, password);
+        setIsAuthenticated(true);
+        setRole(result.role);
+        setName(result.name ?? null);
+        setSubscriptionStatus(result.subscriptionStatus);
+      },
       // Login de un empleado por el código QR que le generó el dueño, sin
       // escribir usuario ni contraseña (ver LoginGate.jsx).
       async loginWithQr(token) {

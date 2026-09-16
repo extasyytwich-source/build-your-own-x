@@ -9,17 +9,21 @@ const CameraScannerModal = lazy(() => import('./CameraScannerModal.jsx'));
 const CAMERA_SUPPORTED = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
 
 export default function LoginGate({ initialMode = 'login', onBack }) {
-  const { login, signup, loginWithGoogle, loginWithQr } = useAuth();
+  const { login, signup, loginWithGoogle, loginEmployee, loginWithQr } = useAuth();
   const [mode, setMode] = useState(initialMode); // 'login' | 'signup'
   // Solo el login se separa por quién entra — crear cuenta es siempre del
   // dueño (un negocio nuevo), así que arranca directo en 'owner'.
   const [audience, setAudience] = useState(initialMode === 'signup' ? 'owner' : null); // null | 'owner' | 'employee'
   const [employeeStep, setEmployeeStep] = useState('choice'); // 'choice' | 'scan' | 'manual'
   const [businessName, setBusinessName] = useState('');
-  // En registro es siempre un correo (el dueño); en login del dueño también;
-  // en login de empleado es su usuario (ver auth.js del server).
+  // En registro es siempre un correo (el dueño); en login del dueño también.
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  // El usuario de un empleado solo es único dentro de su propia tienda (ver
+  // auth.js del server), así que su login manual pide también este código
+  // (el dueño lo ve en Ajustes para compartirlo).
+  const [storeCode, setStoreCode] = useState('');
+  const [employeeUsername, setEmployeeUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [shakeControls, shake] = useShake();
@@ -37,6 +41,20 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
     try {
       if (mode === 'signup') await signup(businessName, identifier, password);
       else await login(identifier, password);
+    } catch (err) {
+      setError(err.message);
+      shake();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleEmployeeSubmit(e) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await loginEmployee(storeCode, employeeUsername, password);
     } catch (err) {
       setError(err.message);
       shake();
@@ -239,14 +257,22 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
           )}
 
           {employeeStep === 'manual' && (
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleEmployeeSubmit}>
               <motion.div animate={shakeControls} className="space-y-3">
                 <input
                   type="text"
                   required
                   autoFocus
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
+                  value={storeCode}
+                  onChange={(e) => setStoreCode(e.target.value)}
+                  placeholder="Código de tienda"
+                  className="input"
+                />
+                <input
+                  type="text"
+                  required
+                  value={employeeUsername}
+                  onChange={(e) => setEmployeeUsername(e.target.value)}
                   placeholder="Usuario"
                   className="input"
                 />
@@ -260,6 +286,9 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
                   className="input"
                 />
               </motion.div>
+              <p className="mt-2 text-center text-xs text-slate-400">
+                El código de tienda te lo da el dueño (lo ve en Ajustes → Empleados).
+              </p>
               {error && (
                 <motion.p
                   initial={{ opacity: 0, x: -6 }}
