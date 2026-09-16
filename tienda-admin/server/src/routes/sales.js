@@ -3,11 +3,29 @@ import PDFDocument from 'pdfkit';
 import { pool } from '../db.js';
 import { broadcast } from '../events.js';
 import { registerMovement } from './movements.js';
+import { sendTelegramMessage } from '../telegram.js';
 
 export const salesRouter = Router();
 
 function formatClp(n) {
   return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(n || 0);
+}
+
+// Aparte de la respuesta al que cobró (que no necesita ver el costo/margen,
+// menos todavía un cajero): un aviso al dueño con qué se vendió y cuánto
+// ganó. No hace nada si el negocio no vinculó un chat de Telegram.
+async function notifySaleByTelegram(businessId, lines, total, profit) {
+  const { rows } = await pool.query('SELECT telegram_chat_id FROM businesses WHERE id = $1', [
+    businessId,
+  ]);
+  const chatId = rows[0]?.telegram_chat_id;
+  if (!chatId) return;
+
+  const itemLines = lines
+    .map((l) => `• ${l.quantity}x ${l.productName} — ${formatClp(l.unitPrice * l.quantity)}`)
+    .join('\n');
+  const text = `🛒 Nueva venta\n\n${itemLines}\n\nTotal: ${formatClp(total)}\nGanancia: ${formatClp(profit)}`;
+  await sendTelegramMessage(chatId, text);
 }
 
 // Cobra varios productos de una vez (el carrito de Caja): cada línea se
@@ -30,6 +48,7 @@ salesRouter.post('/', async (req, res) => {
   }
 
   const client = await pool.connect();
+  let saleId, total, totalCost, lines;
   try {
     await client.query('BEGIN');
     const { rows: saleRows } = await client.query(
@@ -37,10 +56,11 @@ salesRouter.post('/', async (req, res) => {
        VALUES ($1, $2, $3, $4, 0) RETURNING id`,
       [req.businessId, req.userId, method, method === 'efectivo' ? Number(amountReceived) || null : null]
     );
-    const saleId = saleRows[0].id;
+    saleId = saleRows[0].id;
 
-    let total = 0;
-    const lines = [];
+    total = 0;
+    totalCost = 0;
+    lines = [];
     for (const item of items) {
       const movement = await registerMovement(
         client,
@@ -52,6 +72,7 @@ salesRouter.post('/', async (req, res) => {
         saleId
       );
       total += Number(movement.unit_price) * Number(movement.quantity);
+      totalCost += Number(movement.unit_cost) * Number(movement.quantity);
       lines.push({ productName: movement.product_name, quantity: movement.quantity, unitPrice: movement.unit_price });
     }
 
@@ -66,6 +87,8 @@ salesRouter.post('/', async (req, res) => {
 
     broadcast('sale', { total, items: lines.length }, req.headers['x-client-id'], req.businessId);
 
+    // El cajero no necesita ver el costo/margen en la respuesta — el aviso
+    // de Telegram (solo al dueño, si vinculó un chat) sí lleva la ganancia.
     res.status(201).json({
       saleId,
       total,
@@ -75,9 +98,14 @@ salesRouter.post('/', async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(err.status || 500).json({ error: err.message || 'Error interno' });
+    return;
   } finally {
     client.release();
   }
+
+  notifySaleByTelegram(req.businessId, lines, total, total - totalCost).catch((err) => {
+    console.error('Error avisando la venta por Telegram:', err.message);
+  });
 });
 
 salesRouter.get('/:id/receipt.pdf', async (req, res) => {

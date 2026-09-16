@@ -41,9 +41,19 @@ En la sección **Environment** del servicio web, agrega:
 | `ANTHROPIC_API_KEY` | opcional — cada negocio también puede pegar la suya propia desde Ajustes |
 | `GOOGLE_CLIENT_ID` | opcional — habilita "Iniciar sesión con Google" (ver más abajo) |
 | `VITE_GOOGLE_CLIENT_ID` | opcional — mismo valor que `GOOGLE_CLIENT_ID`, pero para el cliente (ver más abajo) |
+| `TELEGRAM_BOT_TOKEN` | opcional — habilita el aviso de venta por Telegram (ver más abajo) |
 
 `PORT` no hace falta configurarlo: Render lo define solo y el servidor ya lo
 respeta (`process.env.PORT`).
+
+**Sobre el aviso de venta por Telegram:** en Telegram, busca **@BotFather**
+→ `/newbot` → seguí los pasos (nombre, usuario terminado en "bot") → te da
+un token — pégalo en `TELEGRAM_BOT_TOKEN`. `PUBLIC_URL` (arriba) tiene que
+estar seteada con la URL real para que el servidor pueda registrar el
+webhook al arrancar (Telegram no puede llamar a `localhost`). Con eso
+listo, cada negocio conecta su propio chat desde Ajustes → Avisos por
+Telegram — no hace falta crear un bot por negocio, es uno solo para toda
+la app.
 
 **Sobre Google Sign-In:** si ya lo configuraste en desarrollo (ver
 `README.md`), agrega el mismo Client ID acá, en **ambas** variables

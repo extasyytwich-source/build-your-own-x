@@ -5,7 +5,16 @@ import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
-import { IconDownload, IconUpload, IconFileText, IconSmartphone, IconUsers, IconX } from './icons.jsx';
+import {
+  IconDownload,
+  IconUpload,
+  IconFileText,
+  IconSmartphone,
+  IconUsers,
+  IconX,
+  IconSend,
+  IconCheckCircle,
+} from './icons.jsx';
 
 const SUBSCRIPTION_LABELS = {
   activa: 'Activa',
@@ -48,10 +57,21 @@ export default function Settings() {
   const [deleteEmployeeTarget, setDeleteEmployeeTarget] = useState(null);
   const [removingEmployee, setRemovingEmployee] = useState(false);
 
+  const [telegramStatus, setTelegramStatus] = useState(null);
+  const [telegramConnecting, setTelegramConnecting] = useState(false);
+  const [telegramLink, setTelegramLink] = useState(null);
+  const [telegramQr, setTelegramQr] = useState(null);
+  const [disconnectingTelegram, setDisconnectingTelegram] = useState(false);
+  const pollRef = useRef(null);
+
   const panelUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
   function loadEmployees() {
     api.getEmployees().then(setEmployees).catch(() => {});
+  }
+
+  function loadTelegramStatus() {
+    return api.getTelegramStatus().then(setTelegramStatus).catch(() => {});
   }
 
   useEffect(() => {
@@ -59,7 +79,53 @@ export default function Settings() {
     api.getBillingStatus().then(setBilling).catch(() => {});
     api.getMe().then((me) => setHasPassword(me.hasPassword)).catch(() => {});
     loadEmployees();
+    loadTelegramStatus();
+    return () => clearInterval(pollRef.current);
   }, []);
+
+  async function handleConnectTelegram() {
+    setTelegramConnecting(true);
+    try {
+      const { url } = await api.connectTelegram();
+      setTelegramLink(url);
+      setTelegramQr(await QRCode.toDataURL(url, { margin: 1, width: 168 }));
+      // El vínculo se confirma del lado de Telegram (cuando tocan "Iniciar"
+      // en el chat), no en esta pestaña — se pregunta cada tanto si ya
+      // llegó, en vez de pedirle a la persona que actualice a mano.
+      clearInterval(pollRef.current);
+      let attempts = 0;
+      pollRef.current = setInterval(async () => {
+        attempts += 1;
+        const status = await api.getTelegramStatus().catch(() => null);
+        if (status?.connected) {
+          clearInterval(pollRef.current);
+          setTelegramStatus(status);
+          setTelegramLink(null);
+          setTelegramQr(null);
+          notify('Telegram conectado');
+        } else if (attempts >= 40) {
+          clearInterval(pollRef.current);
+        }
+      }, 3000);
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setTelegramConnecting(false);
+    }
+  }
+
+  async function handleDisconnectTelegram() {
+    setDisconnectingTelegram(true);
+    try {
+      await api.disconnectTelegram();
+      notify('Telegram desconectado');
+      await loadTelegramStatus();
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setDisconnectingTelegram(false);
+    }
+  }
 
   async function handleCreateEmployee(e) {
     e.preventDefault();
@@ -366,6 +432,66 @@ export default function Settings() {
             {creatingEmployee ? 'Agregando…' : 'Agregar empleado'}
           </button>
         </form>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.09 }}
+        className="card mt-6 max-w-sm p-6"
+      >
+        <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+          <IconSend className="h-4 w-4" />
+          Avisos por Telegram
+        </h2>
+        <p className="mb-4 text-xs text-slate-500">
+          Un mensaje directo cada vez que se registra una venta: qué se vendió y cuánto ganaste.
+        </p>
+
+        {!telegramStatus?.configured ? (
+          <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-400">
+            Esta función todavía no está configurada en el servidor.
+          </p>
+        ) : telegramStatus.connected ? (
+          <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            <span className="flex items-center gap-1.5">
+              <IconCheckCircle className="h-4 w-4" />
+              Conectado
+            </span>
+            <button
+              onClick={handleDisconnectTelegram}
+              disabled={disconnectingTelegram}
+              className="font-medium underline"
+            >
+              {disconnectingTelegram ? 'Desconectando…' : 'Desconectar'}
+            </button>
+          </div>
+        ) : telegramLink ? (
+          <div className="flex flex-col items-center gap-3 text-center">
+            {telegramQr && (
+              <img
+                src={telegramQr}
+                alt="Código QR para conectar Telegram"
+                className="h-36 w-36 rounded-xl border border-slate-200 p-2"
+              />
+            )}
+            <p className="text-xs text-slate-500">
+              Escanea el código o{' '}
+              <a href={telegramLink} target="_blank" rel="noreferrer" className="font-medium underline">
+                abre el chat
+              </a>{' '}
+              y toca "Iniciar" — esto se actualiza solo en cuanto conectes.
+            </p>
+          </div>
+        ) : (
+          <button
+            onClick={handleConnectTelegram}
+            disabled={telegramConnecting}
+            className="btn-secondary w-full"
+          >
+            {telegramConnecting ? 'Conectando…' : 'Conectar Telegram'}
+          </button>
+        )}
       </motion.div>
 
       <motion.div

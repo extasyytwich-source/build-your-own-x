@@ -169,6 +169,15 @@ export function IconCamera(props) {
   );
 }
 
+export function IconSend(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M21 3 3 10.5l7.5 3L13.5 21 21 3Z" />
+      <path d="M10.5 13.5 21 3" />
+    </svg>
+  );
+}
+
 export function IconUsers(props) {
   return (
     <svg viewBox="0 0 24 24" {...base} {...props}>

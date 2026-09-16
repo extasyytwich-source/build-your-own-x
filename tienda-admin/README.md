@@ -43,6 +43,9 @@ información de otra tienda. El acceso requiere una suscripción mensual de
   Claude) que resume todo eso en español.
 - **Control de caja**: registra cuánto dinero realmente ingresó y cuánto
   falta, para contrastarlo contra las ventas que calcula el sistema.
+- **Avisos de venta por Telegram** (opcional): conecta un chat desde Ajustes
+  y recibe ahí, al toque, qué se vendió y cuánto se ganó en cada venta
+  hecha desde Caja.
 - **Todo conectado en tiempo real**: la computadora del dueño, la de la
   caja y el teléfono pueden estar abiertos al mismo tiempo. Cuando
   cualquiera registra un movimiento, las demás pantallas lo ven aparecer
