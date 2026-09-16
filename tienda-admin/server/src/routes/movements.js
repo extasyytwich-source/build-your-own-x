@@ -20,11 +20,15 @@ function serializeMovement(row) {
     stockAfter: row.stock_after,
     note: row.note,
     createdAt: row.created_at,
+    saleId: row.sale_id,
+    refundId: row.refund_id,
+    refunded: Boolean(row.refunded),
   };
 }
 
 const MOVEMENTS_QUERY = `
-  SELECT movements.*, products.name AS product_name
+  SELECT movements.*, products.name AS product_name,
+    EXISTS (SELECT 1 FROM movements r WHERE r.refunded_from_id = movements.id) AS refunded
   FROM movements
   JOIN products ON products.id = movements.product_id
 `;
@@ -82,7 +86,13 @@ export async function registerMovement(
   type,
   quantity,
   note,
-  { saleId = null, purchaseOrderId = null, unitPriceOverride = null } = {}
+  {
+    saleId = null,
+    purchaseOrderId = null,
+    unitPriceOverride = null,
+    refundId = null,
+    refundedFromId = null,
+  } = {}
 ) {
   const { rows: productRows } = await client.query(
     'SELECT * FROM products WHERE business_id = $1 AND id = $2 FOR UPDATE',
@@ -114,8 +124,8 @@ export async function registerMovement(
   const unitPrice = unitPriceOverride !== null ? unitPriceOverride : product.price;
 
   const { rows } = await client.query(
-    `INSERT INTO movements (business_id, product_id, type, quantity, stock_after, note, unit_price, unit_cost, sale_id, purchase_order_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    `INSERT INTO movements (business_id, product_id, type, quantity, stock_after, note, unit_price, unit_cost, sale_id, purchase_order_id, refund_id, refunded_from_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      RETURNING id`,
     [
       businessId,
@@ -128,6 +138,8 @@ export async function registerMovement(
       product.cost,
       saleId,
       purchaseOrderId,
+      refundId,
+      refundedFromId,
     ]
   );
 

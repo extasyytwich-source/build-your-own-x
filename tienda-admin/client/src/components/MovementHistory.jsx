@@ -4,9 +4,10 @@ import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useLiveUpdates } from '../context/LiveUpdatesContext.jsx';
-import { IconPlusCircle, IconMinusCircle, IconWrench, IconReceipt, IconFileText } from './icons.jsx';
+import { IconPlusCircle, IconMinusCircle, IconWrench, IconReceipt, IconFileText, IconX } from './icons.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import EmptyState from './EmptyState.jsx';
+import ConfirmDialog from './ConfirmDialog.jsx';
 
 const TYPE_STYLES = {
   entrada: { label: 'Entrada', className: 'bg-emerald-50 text-emerald-700', Icon: IconPlusCircle },
@@ -22,6 +23,8 @@ export default function MovementHistory() {
   const { notify } = useToast();
   const { lastEvent } = useLiveUpdates();
   const [generatingId, setGeneratingId] = useState(null);
+  const [refundTarget, setRefundTarget] = useState(null);
+  const [refunding, setRefunding] = useState(false);
 
   async function handleViewInvoice(movementId) {
     setGeneratingId(movementId);
@@ -34,11 +37,25 @@ export default function MovementHistory() {
     }
   }
 
-  useEffect(() => {
+  async function handleRefund() {
+    setRefunding(true);
+    try {
+      await api.createRefund({ saleId: refundTarget.saleId, movementId: refundTarget.id });
+      notify('Devolución registrada: se repuso el stock');
+      setRefundTarget(null);
+      loadMovements();
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setRefunding(false);
+    }
+  }
+
+  function loadMovements() {
     setLoading(true);
     const params = { limit: 100 };
     if (type) params.type = type;
-    api
+    return api
       .getMovements(params)
       .then(setMovements)
       .catch((err) => {
@@ -46,6 +63,10 @@ export default function MovementHistory() {
         notify(err.message, 'error');
       })
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadMovements();
     // Se vuelve a pedir también cuando otra pantalla conectada (la caja, el
     // teléfono) registra un movimiento, para que el historial se vea al día.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -104,17 +125,32 @@ export default function MovementHistory() {
                       <td className="px-4 py-3 text-slate-700">{m.quantity}</td>
                       <td className="px-4 py-3 text-slate-700">{m.stockAfter}</td>
                       <td className="px-4 py-3 text-slate-500">{m.note || '—'}</td>
-                      <td className="px-4 py-3 text-right">
-                        {m.type === 'salida' && (
-                          <button
-                            onClick={() => handleViewInvoice(m.id)}
-                            disabled={generatingId === m.id}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 underline hover:text-slate-800"
-                          >
-                            <IconFileText className="h-3.5 w-3.5" />
-                            {generatingId === m.id ? 'Generando…' : 'Ver recibo'}
-                          </button>
-                        )}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-3">
+                          {m.type === 'salida' && (
+                            <button
+                              onClick={() => handleViewInvoice(m.id)}
+                              disabled={generatingId === m.id}
+                              className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 underline hover:text-slate-800"
+                            >
+                              <IconFileText className="h-3.5 w-3.5" />
+                              {generatingId === m.id ? 'Generando…' : 'Ver recibo'}
+                            </button>
+                          )}
+                          {m.type === 'salida' && m.saleId && (
+                            m.refunded ? (
+                              <span className="text-xs font-medium text-slate-400">Devuelto</span>
+                            ) : (
+                              <button
+                                onClick={() => setRefundTarget(m)}
+                                className="inline-flex items-center gap-1 text-xs font-medium text-rose-500 hover:text-rose-700"
+                              >
+                                <IconX className="h-3.5 w-3.5" />
+                                Devolver
+                              </button>
+                            )
+                          )}
+                        </div>
                       </td>
                     </motion.tr>
                   );
@@ -129,6 +165,15 @@ export default function MovementHistory() {
           <EmptyState icon={IconReceipt} title="Todavía no hay movimientos registrados" />
         )}
       </div>
+
+      <ConfirmDialog
+        open={Boolean(refundTarget)}
+        onClose={() => setRefundTarget(null)}
+        onConfirm={handleRefund}
+        title="Devolver producto"
+        message={`¿Devolver "${refundTarget?.productName}" (x${refundTarget?.quantity})? Se repone el stock y se descuenta de las ventas del mes.`}
+        confirmLabel={refunding ? 'Devolviendo…' : 'Devolver'}
+      />
     </div>
   );
 }

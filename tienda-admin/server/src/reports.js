@@ -20,12 +20,24 @@ export async function computeMonthlyStats(businessId, month) {
     )
   ).rows[0];
 
+  // Una devolución también registra una "entrada" (repone stock), pero no
+  // es una reposición de proveedor — se excluye de este gasto para no
+  // mezclar ambas cosas.
   const restocks = (
     await pool.query(
       `SELECT COALESCE(SUM(quantity * unit_cost), 0) AS "restockCost", COUNT(*) AS count
        FROM movements
-       WHERE business_id = $1 AND type = 'entrada'
+       WHERE business_id = $1 AND type = 'entrada' AND refund_id IS NULL
          AND created_at >= $2::timestamptz AND created_at < $3::timestamptz`,
+      [businessId, start, end]
+    )
+  ).rows[0];
+
+  const refunds = (
+    await pool.query(
+      `SELECT COALESCE(SUM(total), 0) AS total, COALESCE(SUM(cost), 0) AS cost, COUNT(*) AS count
+       FROM refunds
+       WHERE business_id = $1 AND created_at >= $2::timestamptz AND created_at < $3::timestamptz`,
       [businessId, start, end]
     )
   ).rows[0];
@@ -50,12 +62,16 @@ export async function computeMonthlyStats(businessId, month) {
 
   // Desglose de impuestos del mes (para que el dueño sepa cuánto de lo
   // vendido es IVA/impuesto adicional, no solo el total): cada línea de
-  // venta según la categoría del producto en ese momento.
+  // venta según la categoría del producto en ese momento, restando lo
+  // devuelto (las "entradas" etiquetadas con refund_id) para que quede el
+  // neto real vendido, no lo bruto antes de la devolución.
   const taxRows = (
     await pool.query(
-      `SELECT movements.quantity, movements.unit_price, products.tax_category
+      `SELECT movements.quantity, movements.unit_price, products.tax_category,
+         CASE WHEN movements.type = 'salida' THEN 1 ELSE -1 END AS sign
        FROM movements JOIN products ON products.id = movements.product_id
-       WHERE movements.business_id = $1 AND movements.type = 'salida'
+       WHERE movements.business_id = $1
+         AND (movements.type = 'salida' OR movements.refund_id IS NOT NULL)
          AND movements.created_at >= $2::timestamptz AND movements.created_at < $3::timestamptz`,
       [businessId, start, end]
     )
@@ -63,9 +79,9 @@ export async function computeMonthlyStats(businessId, month) {
   const taxes = taxRows.reduce(
     (acc, row) => {
       const { neto, iva, adicional } = computeTax(row.quantity * row.unit_price, row.tax_category);
-      acc.neto += neto;
-      acc.iva += iva;
-      acc.impuestoAdicional += adicional;
+      acc.neto += neto * row.sign;
+      acc.iva += iva * row.sign;
+      acc.impuestoAdicional += adicional * row.sign;
       return acc;
     },
     { neto: 0, iva: 0, impuestoAdicional: 0 }
@@ -82,13 +98,15 @@ export async function computeMonthlyStats(businessId, month) {
     )
   ).rows[0];
 
-  const profit = sales.revenue - sales.cost;
-  const difference = cash.registeredIncome - sales.revenue;
+  const revenue = sales.revenue - refunds.total;
+  const cost = sales.cost - refunds.cost;
+  const profit = revenue - cost;
+  const difference = cash.registeredIncome - revenue;
 
   return {
     month,
-    revenue: sales.revenue,
-    cost: sales.cost,
+    revenue,
+    cost,
     profit,
     salesCount: sales.count,
     restockCost: restocks.restockCost,
@@ -96,10 +114,11 @@ export async function computeMonthlyStats(businessId, month) {
     restockNeeded,
     criticalItems,
     taxes,
+    refunds: { total: refunds.total, count: refunds.count },
     cash: {
       registeredIncome: cash.registeredIncome,
       missingAmount: cash.missingAmount,
-      expectedRevenue: sales.revenue,
+      expectedRevenue: revenue,
       difference,
     },
   };

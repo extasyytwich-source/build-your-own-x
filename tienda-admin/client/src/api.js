@@ -101,6 +101,8 @@ export const api = {
   createSale: (data) => request('/sales', { method: 'POST', body: data }),
   viewSaleReceipt: (saleId) => openFile(`/sales/${saleId}/receipt.pdf`),
 
+  createRefund: (data) => request('/refunds', { method: 'POST', body: data }),
+
   getEmployees: () => request('/employees'),
   createEmployee: (data) => request('/employees', { method: 'POST', body: data }),
   deleteEmployee: (id) => request(`/employees/${id}`, { method: 'DELETE' }),
