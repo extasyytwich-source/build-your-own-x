@@ -11,12 +11,14 @@ import MovementHistory from './components/MovementHistory.jsx';
 import Reports from './components/Reports.jsx';
 import Settings from './components/Settings.jsx';
 import Caja from './components/Caja.jsx';
+import Purchases from './components/Purchases.jsx';
 import LoadingSpinner from './components/LoadingSpinner.jsx';
 
 const VIEWS = {
   dashboard: { label: 'Panel', component: Dashboard },
   caja: { label: 'Caja', component: Caja },
   products: { label: 'Productos', component: ProductList },
+  purchases: { label: 'Compras', component: Purchases },
   history: { label: 'Historial', component: MovementHistory },
   reports: { label: 'Reportes', component: Reports },
   settings: { label: 'Ajustes', component: Settings },

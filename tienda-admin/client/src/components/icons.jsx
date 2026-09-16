@@ -304,3 +304,14 @@ export function IconRefreshCw(props) {
     </svg>
   );
 }
+
+export function IconTruck(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M2 7h11v10H2z" />
+      <path d="M13 10h4l4 3v4h-8z" />
+      <circle cx="6" cy="19" r="1.6" />
+      <circle cx="17" cy="19" r="1.6" />
+    </svg>
+  );
+}
