@@ -95,7 +95,7 @@ export default function Caja() {
     }
     searchTimeout.current = setTimeout(async () => {
       try {
-        const data = await api.getProducts({ search: value });
+        const data = await api.getProducts({ search: value, sellable: 1 });
         setResults(data.slice(0, 8));
       } catch (err) {
         if (err.status === 401) handleUnauthorized();

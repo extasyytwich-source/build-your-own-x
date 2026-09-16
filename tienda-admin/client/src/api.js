@@ -70,6 +70,8 @@ export const api = {
   createProduct: (data) => request('/products', { method: 'POST', body: data }),
   updateProduct: (id, data) => request(`/products/${id}`, { method: 'PUT', body: data }),
   deleteProduct: (id) => request(`/products/${id}`, { method: 'DELETE' }),
+  createProductVariant: (productId, data) =>
+    request(`/products/${productId}/variants`, { method: 'POST', body: data }),
 
   getMovements: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
