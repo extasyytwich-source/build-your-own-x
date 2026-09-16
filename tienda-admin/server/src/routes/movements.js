@@ -68,9 +68,19 @@ movementsRouter.get('/export.csv', async (req, res) => {
   sendCsv(res, 'movimientos.csv', csv);
 });
 
-// Exportada para que routes/sales.js registre cada línea del carrito como
-// la misma "salida" de siempre, etiquetada con el saleId del ticket.
-export async function registerMovement(client, businessId, productId, type, quantity, note, saleId = null) {
+// Exportada para que routes/sales.js y routes/purchaseOrders.js registren
+// cada línea del carrito/orden como el mismo movimiento de siempre,
+// etiquetado con el saleId o purchaseOrderId correspondiente.
+export async function registerMovement(
+  client,
+  businessId,
+  productId,
+  type,
+  quantity,
+  note,
+  saleId = null,
+  purchaseOrderId = null
+) {
   const { rows: productRows } = await client.query(
     'SELECT * FROM products WHERE business_id = $1 AND id = $2 FOR UPDATE',
     [businessId, productId]
@@ -99,10 +109,21 @@ export async function registerMovement(client, businessId, productId, type, quan
   ]);
 
   const { rows } = await client.query(
-    `INSERT INTO movements (business_id, product_id, type, quantity, stock_after, note, unit_price, unit_cost, sale_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `INSERT INTO movements (business_id, product_id, type, quantity, stock_after, note, unit_price, unit_cost, sale_id, purchase_order_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING id`,
-    [businessId, productId, type, quantity, newStock, note || null, product.price, product.cost, saleId]
+    [
+      businessId,
+      productId,
+      type,
+      quantity,
+      newStock,
+      note || null,
+      product.price,
+      product.cost,
+      saleId,
+      purchaseOrderId,
+    ]
   );
 
   const { rows: joined } = await client.query(`${MOVEMENTS_QUERY} WHERE movements.id = $1`, [

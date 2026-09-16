@@ -11,12 +11,14 @@ import {
   IconStore,
   IconWifi,
   IconWallet,
+  IconTruck,
 } from './icons.jsx';
 
 const ICONS = {
   dashboard: IconGrid,
   caja: IconWallet,
   products: IconBox,
+  purchases: IconTruck,
   history: IconReceipt,
   reports: IconTrendingUp,
   settings: IconSettings,

@@ -19,6 +19,8 @@ import { reportsRouter } from './routes/reports.js';
 import { settingsRouter } from './routes/settings.js';
 import { employeesRouter } from './routes/employees.js';
 import { salesRouter } from './routes/sales.js';
+import { suppliersRouter } from './routes/suppliers.js';
+import { purchaseOrdersRouter } from './routes/purchaseOrders.js';
 import { telegramRouter } from './routes/telegram.js';
 import { telegramWebhookRouter } from './routes/telegramWebhook.js';
 import { eventsRouter } from './routes/events.js';
@@ -105,6 +107,8 @@ export function createApp() {
   app.use('/api/reports', requireAuth, requireActiveSubscription, requireOwner, reportsRouter);
   app.use('/api/settings', requireAuth, requireActiveSubscription, requireOwner, settingsRouter);
   app.use('/api/employees', requireAuth, requireActiveSubscription, requireOwner, employeesRouter);
+  app.use('/api/suppliers', requireAuth, requireActiveSubscription, requireOwner, suppliersRouter);
+  app.use('/api/purchase-orders', requireAuth, requireActiveSubscription, requireOwner, purchaseOrdersRouter);
   // Cobrar es lo único que necesita el cajero: compartido entre owner y cajero.
   app.use('/api/sales', requireAuth, requireActiveSubscription, salesRouter);
   // El webhook (público, lo llama Telegram) va montado antes que las rutas

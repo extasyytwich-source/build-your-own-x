@@ -126,6 +126,21 @@ export const api = {
   },
 
   viewInvoice: (movementId) => openFile(`/movements/${movementId}/invoice.pdf`),
+
+  getSuppliers: () => request('/suppliers'),
+  createSupplier: (data) => request('/suppliers', { method: 'POST', body: data }),
+  updateSupplier: (id, data) => request(`/suppliers/${id}`, { method: 'PUT', body: data }),
+  deleteSupplier: (id) => request(`/suppliers/${id}`, { method: 'DELETE' }),
+
+  getPurchaseOrders: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/purchase-orders${qs ? `?${qs}` : ''}`);
+  },
+  getPurchaseOrder: (id) => request(`/purchase-orders/${id}`),
+  createPurchaseOrder: (data) => request('/purchase-orders', { method: 'POST', body: data }),
+  receivePurchaseOrder: (id) => request(`/purchase-orders/${id}/receive`, { method: 'POST' }),
+  cancelPurchaseOrder: (id) => request(`/purchase-orders/${id}/cancel`, { method: 'POST' }),
+  deletePurchaseOrder: (id) => request(`/purchase-orders/${id}`, { method: 'DELETE' }),
 };
 
 function todayStamp() {
