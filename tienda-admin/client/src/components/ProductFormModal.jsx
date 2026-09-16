@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import Modal from './Modal.jsx';
 import { useShake } from '../hooks/useShake.js';
+import { IconCamera, IconX } from './icons.jsx';
 
 const EMPTY = {
   name: '',
@@ -14,7 +15,33 @@ const EMPTY = {
   unit: 'unidad',
   description: '',
   taxCategory: 'general',
+  imageUrl: '',
 };
+
+// No hay almacenamiento de archivos (S3 u otro) configurado, así que la
+// foto se guarda directo en la base como data URI — para que eso sea
+// razonable, se achica y comprime en el navegador antes de guardarla
+// (lado largo máx. 480px, JPEG calidad 0.72 ⇒ típicamente 20-60 KB).
+function resizeImageFile(file, maxSize = 480, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('No se pudo leer la imagen'));
+    };
+    img.src = url;
+  });
+}
 
 // Las tasas son ley (Chile: IVA 19% + impuesto adicional a bebidas según
 // DL 825 art. 42) — ver server/src/tax.js. Acá el dueño solo elige la
@@ -32,6 +59,7 @@ export default function ProductFormModal({ open, onClose, onSubmit, product, ini
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [shakeControls, shake] = useShake();
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (open) {
@@ -48,6 +76,7 @@ export default function ProductFormModal({ open, onClose, onSubmit, product, ini
               unit: product.unit,
               description: product.description || '',
               taxCategory: product.taxCategory || 'general',
+              imageUrl: product.imageUrl || '',
             }
           : { ...EMPTY, sku: initialSku }
       );
@@ -57,6 +86,18 @@ export default function ProductFormModal({ open, onClose, onSubmit, product, ini
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  async function handlePickImage(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      update('imageUrl', await resizeImageFile(file));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   }
 
   async function handleSubmit(e) {
@@ -85,6 +126,42 @@ export default function ProductFormModal({ open, onClose, onSubmit, product, ini
         onSubmit={handleSubmit}
         className="grid grid-cols-2 gap-4"
       >
+        <div className="col-span-2 flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-slate-400 hover:text-slate-500"
+          >
+            {form.imageUrl ? (
+              <img src={form.imageUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <IconCamera className="h-6 w-6" />
+            )}
+          </button>
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePickImage}
+            />
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="btn-secondary text-xs">
+              {form.imageUrl ? 'Cambiar foto' : 'Agregar foto'}
+            </button>
+            {form.imageUrl && (
+              <button
+                type="button"
+                onClick={() => update('imageUrl', '')}
+                className="ml-2 inline-flex items-center gap-1 text-xs text-slate-400 hover:text-rose-500"
+              >
+                <IconX className="h-3.5 w-3.5" />
+                Quitar
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="col-span-2">
           <label className="label">Nombre*</label>
           <input

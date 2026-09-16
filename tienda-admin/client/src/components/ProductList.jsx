@@ -219,8 +219,19 @@ export default function ProductList() {
                     className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60"
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-800">{p.name}</div>
-                      {p.sku && <div className="text-xs text-slate-400">SKU: {p.sku}</div>}
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                          {p.imageUrl ? (
+                            <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <IconBox className="h-4 w-4 text-slate-300" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-medium text-slate-800">{p.name}</div>
+                          {p.sku && <div className="text-xs text-slate-400">SKU: {p.sku}</div>}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-slate-500">{p.category}</td>
                     <td className="px-4 py-3 text-slate-700">{currency(p.price)}</td>

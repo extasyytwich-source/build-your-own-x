@@ -196,13 +196,22 @@ export default function Caja() {
               <button
                 key={product.id}
                 onClick={() => addToCart(product)}
-                className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-slate-50"
+                className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-slate-50"
               >
-                <span>
-                  <span className="font-medium text-slate-700">{product.name}</span>
-                  {product.sku && <span className="ml-2 text-xs text-slate-400">SKU: {product.sku}</span>}
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                    {product.imageUrl ? (
+                      <img src={product.imageUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <IconStore className="h-3.5 w-3.5 text-slate-300" />
+                    )}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium text-slate-700">{product.name}</span>
+                    {product.sku && <span className="text-xs text-slate-400">SKU: {product.sku}</span>}
+                  </span>
                 </span>
-                <span className="text-slate-500">{currency(product.price)}</span>
+                <span className="shrink-0 text-slate-500">{currency(product.price)}</span>
               </button>
             ))}
           </div>
@@ -225,6 +234,13 @@ export default function Caja() {
                   exit={{ opacity: 0, height: 0 }}
                   className="flex items-center gap-3 px-4 py-3"
                 >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                    {line.product.imageUrl ? (
+                      <img src={line.product.imageUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <IconStore className="h-4 w-4 text-slate-300" />
+                    )}
+                  </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-slate-700">{line.product.name}</p>
                     <p className="text-xs text-slate-400">{currency(line.product.price)} c/u</p>
