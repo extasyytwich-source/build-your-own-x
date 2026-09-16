@@ -57,6 +57,9 @@ export const api = {
   getMe: () => request('/auth/me'),
   changePassword: (currentPassword, newPassword) =>
     request('/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } }),
+  forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: { email } }),
+  resetPassword: (token, newPassword) =>
+    request('/auth/reset-password', { method: 'POST', body: { token, newPassword } }),
 
   getBillingStatus: () => request('/billing/status'),
   subscribe: () => request('/billing/subscribe', { method: 'POST' }),

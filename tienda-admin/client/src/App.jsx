@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from './context/AuthContext.jsx';
 import Landing from './components/Landing.jsx';
 import LoginGate from './components/LoginGate.jsx';
+import ResetPassword from './components/ResetPassword.jsx';
 import Suscripcion from './components/Suscripcion.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import Dashboard from './components/Dashboard.jsx';
@@ -29,6 +30,11 @@ export default function App() {
     useAuth();
   const [view, setView] = useState('dashboard');
   const [authView, setAuthView] = useState(null); // null (landing) | 'login' | 'signup'
+  // El enlace del correo de "recuperar contraseña" trae este parámetro — se
+  // muestra esa pantalla en vez de lo que sea que toque normalmente, haya o
+  // no una sesión vieja abierta en este navegador.
+  const [resetToken] = useState(() => new URLSearchParams(window.location.search).get('resetToken'));
+  const [resetTokenConsumed, setResetTokenConsumed] = useState(false);
 
   // Recién registró su negocio y terminó de pagar: en vez de entrar directo
   // al panel, cierra la sesión y vuelve al selector "soy dueño o empleado"
@@ -38,6 +44,19 @@ export default function App() {
       logout().then(() => setAuthView('login'));
     }
   }, [isAuthenticated, justCompletedSignup, subscriptionStatus, logout]);
+
+  if (resetToken && !resetTokenConsumed) {
+    return (
+      <ResetPassword
+        token={resetToken}
+        onDone={() => {
+          window.history.replaceState({}, '', window.location.pathname);
+          setResetTokenConsumed(true);
+          setAuthView('login');
+        }}
+      />
+    );
+  }
 
   if (!isAuthenticated) {
     if (!authView) {

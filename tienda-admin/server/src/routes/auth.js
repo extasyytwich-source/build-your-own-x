@@ -1,5 +1,7 @@
 import { Router } from 'express';
+import crypto from 'node:crypto';
 import { pool } from '../db.js';
+import { sendEmail } from '../email.js';
 import {
   createBusiness,
   verifyCredentials,
@@ -197,5 +199,68 @@ authRouter.post('/change-password', requireAuth, async (req, res) => {
   }
 
   await updatePassword(req.userId, newPassword);
+  res.json({ ok: true });
+});
+
+// Genérico a propósito: no confirma si el correo existe o no, para no
+// convertir el formulario en una forma de averiguar qué negocios están
+// registrados. Solo el dueño tiene correo (el empleado entra con usuario,
+// sin casilla real), así que solo se busca ahí.
+const FORGOT_PASSWORD_RESPONSE = {
+  message: 'Si el correo existe, te enviamos un enlace para restablecer tu contraseña.',
+};
+
+authRouter.post('/forgot-password', async (req, res) => {
+  const { email } = req.body ?? {};
+  if (!email || !EMAIL_RE.test(String(email))) {
+    return res.status(400).json({ error: 'Ingresa un correo válido' });
+  }
+
+  const normalized = String(email).toLowerCase().trim();
+  const { rows } = await pool.query("SELECT id FROM users WHERE email = $1 AND role = 'owner'", [normalized]);
+  const user = rows[0];
+  if (!user) return res.json(FORGOT_PASSWORD_RESPONSE);
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // vence en 1 hora
+  await pool.query('INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [
+    user.id,
+    token,
+    expiresAt,
+  ]);
+
+  const publicUrl = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
+  const resetUrl = `${publicUrl}/?resetToken=${token}`;
+  await sendEmail({
+    to: normalized,
+    subject: 'Restablece tu contraseña de Mostrador',
+    html: `
+      <p>Alguien pidió restablecer la contraseña de tu cuenta de Mostrador.</p>
+      <p><a href="${resetUrl}">Restablecer contraseña</a></p>
+      <p>Este enlace vence en 1 hora. Si no fuiste tú, ignora este correo — tu contraseña sigue igual.</p>
+    `,
+  });
+
+  res.json(FORGOT_PASSWORD_RESPONSE);
+});
+
+authRouter.post('/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body ?? {};
+  if (!token) return res.status(400).json({ error: 'Falta el enlace de recuperación' });
+  if (!newPassword || String(newPassword).length < 8) {
+    return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
+  }
+
+  const { rows } = await pool.query(
+    'SELECT user_id FROM password_reset_tokens WHERE token = $1 AND used_at IS NULL AND expires_at > now()',
+    [token]
+  );
+  const record = rows[0];
+  if (!record) {
+    return res.status(400).json({ error: 'El enlace no es válido o ya venció. Pide uno nuevo.' });
+  }
+
+  await updatePassword(record.user_id, newPassword);
+  await pool.query('UPDATE password_reset_tokens SET used_at = now() WHERE token = $1', [token]);
   res.json({ ok: true });
 });
