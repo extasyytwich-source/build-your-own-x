@@ -9,7 +9,7 @@ export default function ScrollProgress() {
   return (
     <motion.div
       style={{ scaleX }}
-      className="absolute inset-x-0 bottom-0 h-[2px] origin-left bg-black"
+      className="absolute inset-x-0 bottom-0 h-[2px] origin-left bg-gradient-to-r from-iris via-coral to-aqua"
     />
   );
 }

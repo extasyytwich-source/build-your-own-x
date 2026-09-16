@@ -38,13 +38,13 @@ export default function DemoShowcase() {
             key={tab.key}
             onClick={() => setActive(tab.key)}
             className={`relative rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-              tab.key === active ? 'text-white' : 'text-slate-500 hover:text-slate-700'
+              tab.key === active ? 'text-white' : 'text-white/50 hover:text-white/80'
             }`}
           >
             {tab.key === active && (
               <motion.span
                 layoutId="demo-tab-pill"
-                className="absolute inset-0 rounded-full bg-black"
+                className="absolute inset-0 rounded-full bg-iris"
                 transition={{ type: 'spring', stiffness: 350, damping: 30 }}
               />
             )}
@@ -53,11 +53,11 @@ export default function DemoShowcase() {
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-soft">
-        <div className="flex items-center gap-1.5 border-b border-slate-800 px-4 py-2.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-slate-600" />
-          <span className="h-2.5 w-2.5 rounded-full bg-slate-600" />
-          <span className="h-2.5 w-2.5 rounded-full bg-slate-600" />
+      <div className="overflow-hidden rounded-2xl border border-night-border bg-night-card shadow-glow">
+        <div className="flex items-center gap-1.5 border-b border-night-border px-4 py-2.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+          <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
+          <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
         </div>
         <div className="relative aspect-[16/10] w-full overflow-hidden bg-white sm:aspect-[16/9]">
           <AnimatePresence mode="wait">
@@ -76,7 +76,7 @@ export default function DemoShowcase() {
         </div>
       </div>
 
-      <p className="mx-auto mt-5 max-w-lg text-center text-sm text-slate-500">{current.caption}</p>
+      <p className="mx-auto mt-5 max-w-lg text-center text-sm text-white/60">{current.caption}</p>
     </div>
   );
 }
