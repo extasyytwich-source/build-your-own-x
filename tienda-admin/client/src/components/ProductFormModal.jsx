@@ -16,6 +16,7 @@ const EMPTY = {
   description: '',
   taxCategory: 'general',
   imageUrl: '',
+  variantName: '',
 };
 
 // No hay almacenamiento de archivos (S3 u otro) configurado, así que la
@@ -54,12 +55,20 @@ const TAX_CATEGORIES = [
   { value: 'exento', label: 'Exento' },
 ];
 
-export default function ProductFormModal({ open, onClose, onSubmit, product, initialSku = '' }) {
+export default function ProductFormModal({
+  open,
+  onClose,
+  onSubmit,
+  product,
+  initialSku = '',
+  variantParent = null,
+}) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [shakeControls, shake] = useShake();
   const fileInputRef = useRef(null);
+  const isVariant = Boolean(variantParent);
 
   useEffect(() => {
     if (open) {
@@ -77,6 +86,7 @@ export default function ProductFormModal({ open, onClose, onSubmit, product, ini
               description: product.description || '',
               taxCategory: product.taxCategory || 'general',
               imageUrl: product.imageUrl || '',
+              variantName: product.variantName || '',
             }
           : { ...EMPTY, sku: initialSku }
       );
@@ -118,7 +128,13 @@ export default function ProductFormModal({ open, onClose, onSubmit, product, ini
     <Modal
       open={open}
       onClose={onClose}
-      title={product ? 'Editar producto' : 'Nuevo producto'}
+      title={
+        isVariant
+          ? `${product ? 'Editar' : 'Nueva'} variante — ${variantParent.name}`
+          : product
+            ? 'Editar producto'
+            : 'Nuevo producto'
+      }
       width="max-w-lg"
     >
       <motion.form
@@ -126,52 +142,70 @@ export default function ProductFormModal({ open, onClose, onSubmit, product, ini
         onSubmit={handleSubmit}
         className="grid grid-cols-2 gap-4"
       >
-        <div className="col-span-2 flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-slate-400 hover:text-slate-500"
-          >
-            {form.imageUrl ? (
-              <img src={form.imageUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <IconCamera className="h-6 w-6" />
-            )}
-          </button>
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handlePickImage}
-            />
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="btn-secondary text-xs">
-              {form.imageUrl ? 'Cambiar foto' : 'Agregar foto'}
+        {!isVariant && (
+          <div className="col-span-2 flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-slate-400 hover:text-slate-500"
+            >
+              {form.imageUrl ? (
+                <img src={form.imageUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <IconCamera className="h-6 w-6" />
+              )}
             </button>
-            {form.imageUrl && (
-              <button
-                type="button"
-                onClick={() => update('imageUrl', '')}
-                className="ml-2 inline-flex items-center gap-1 text-xs text-slate-400 hover:text-rose-500"
-              >
-                <IconX className="h-3.5 w-3.5" />
-                Quitar
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePickImage}
+              />
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="btn-secondary text-xs">
+                {form.imageUrl ? 'Cambiar foto' : 'Agregar foto'}
               </button>
-            )}
+              {form.imageUrl && (
+                <button
+                  type="button"
+                  onClick={() => update('imageUrl', '')}
+                  className="ml-2 inline-flex items-center gap-1 text-xs text-slate-400 hover:text-rose-500"
+                >
+                  <IconX className="h-3.5 w-3.5" />
+                  Quitar
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="col-span-2">
-          <label className="label">Nombre*</label>
-          <input
-            required
-            className="input"
-            value={form.name}
-            onChange={(e) => update('name', e.target.value)}
-            placeholder="Ej. Café en grano 1kg"
-          />
-        </div>
+        {isVariant ? (
+          <div className="col-span-2">
+            <label className="label">Nombre de la variante*</label>
+            <input
+              required
+              className="input"
+              value={form.variantName}
+              onChange={(e) => update('variantName', e.target.value)}
+              placeholder="Ej. Talla M / Azul"
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Categoría, impuesto, foto y unidad se heredan de "{variantParent.name}".
+            </p>
+          </div>
+        ) : (
+          <div className="col-span-2">
+            <label className="label">Nombre*</label>
+            <input
+              required
+              className="input"
+              value={form.name}
+              onChange={(e) => update('name', e.target.value)}
+              placeholder="Ej. Café en grano 1kg"
+            />
+          </div>
+        )}
 
         <div>
           <label className="label">SKU / código</label>
@@ -183,30 +217,34 @@ export default function ProductFormModal({ open, onClose, onSubmit, product, ini
           />
         </div>
 
-        <div>
-          <label className="label">Categoría</label>
-          <input
-            className="input"
-            value={form.category}
-            onChange={(e) => update('category', e.target.value)}
-            placeholder="Ej. Bebidas"
-          />
-        </div>
+        {!isVariant && (
+          <div>
+            <label className="label">Categoría</label>
+            <input
+              className="input"
+              value={form.category}
+              onChange={(e) => update('category', e.target.value)}
+              placeholder="Ej. Bebidas"
+            />
+          </div>
+        )}
 
-        <div className="col-span-2">
-          <label className="label">Categoría de impuesto</label>
-          <select
-            className="input"
-            value={form.taxCategory}
-            onChange={(e) => update('taxCategory', e.target.value)}
-          >
-            {TAX_CATEGORIES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {!isVariant && (
+          <div className="col-span-2">
+            <label className="label">Categoría de impuesto</label>
+            <select
+              className="input"
+              value={form.taxCategory}
+              onChange={(e) => update('taxCategory', e.target.value)}
+            >
+              {TAX_CATEGORIES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div>
           <label className="label">Precio de venta</label>
@@ -262,25 +300,29 @@ export default function ProductFormModal({ open, onClose, onSubmit, product, ini
           />
         </div>
 
-        <div className="col-span-2">
-          <label className="label">Unidad</label>
-          <input
-            className="input"
-            value={form.unit}
-            onChange={(e) => update('unit', e.target.value)}
-            placeholder="unidad, kg, caja, litro…"
-          />
-        </div>
+        {!isVariant && (
+          <div className="col-span-2">
+            <label className="label">Unidad</label>
+            <input
+              className="input"
+              value={form.unit}
+              onChange={(e) => update('unit', e.target.value)}
+              placeholder="unidad, kg, caja, litro…"
+            />
+          </div>
+        )}
 
-        <div className="col-span-2">
-          <label className="label">Descripción</label>
-          <textarea
-            className="input"
-            rows={2}
-            value={form.description}
-            onChange={(e) => update('description', e.target.value)}
-          />
-        </div>
+        {!isVariant && (
+          <div className="col-span-2">
+            <label className="label">Descripción</label>
+            <textarea
+              className="input"
+              rows={2}
+              value={form.description}
+              onChange={(e) => update('description', e.target.value)}
+            />
+          </div>
+        )}
 
         {error && <p className="col-span-2 text-sm text-rose-600">{error}</p>}
 

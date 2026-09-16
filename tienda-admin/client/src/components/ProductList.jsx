@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -10,7 +10,7 @@ import MovementModal from './MovementModal.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import EmptyState from './EmptyState.jsx';
-import { IconAlertTriangle, IconBox, IconBarcode, IconCamera } from './icons.jsx';
+import { IconAlertTriangle, IconBox, IconBarcode, IconCamera, IconChevronDown } from './icons.jsx';
 
 // La librería de decodificación (ZXing) pesa bastante: se carga solo cuando
 // alguien realmente abre el escáner de cámara, no en cada visita a Productos.
@@ -30,10 +30,21 @@ export default function ProductList() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [variantParent, setVariantParent] = useState(null);
   const [scannedSku, setScannedSku] = useState('');
   const [movementProduct, setMovementProduct] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [expanded, setExpanded] = useState(() => new Set());
+
+  function toggleExpanded(id) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const { handleUnauthorized } = useAuth();
   const { notify } = useToast();
@@ -68,7 +79,16 @@ export default function ProductList() {
   }, [search, category, lastEvent]);
 
   async function handleCreateOrUpdate(form) {
-    if (editing) {
+    if (variantParent) {
+      if (editing) {
+        await api.updateProduct(editing.id, form);
+        notify('Variante actualizada');
+      } else {
+        await api.createProductVariant(variantParent.id, form);
+        notify('Variante creada');
+        setExpanded((prev) => new Set(prev).add(variantParent.id));
+      }
+    } else if (editing) {
       await api.updateProduct(editing.id, form);
       notify('Producto actualizado');
     } else {
@@ -77,8 +97,28 @@ export default function ProductList() {
     }
     setFormOpen(false);
     setEditing(null);
+    setVariantParent(null);
     setScannedSku('');
     loadProducts();
+  }
+
+  function closeForm() {
+    setFormOpen(false);
+    setEditing(null);
+    setVariantParent(null);
+    setScannedSku('');
+  }
+
+  function openNewVariant(product) {
+    setEditing(null);
+    setVariantParent(product);
+    setFormOpen(true);
+  }
+
+  function openEditVariant(product, variant) {
+    setEditing(variant);
+    setVariantParent(product);
+    setFormOpen(true);
   }
 
   async function handleMovement(data) {
@@ -139,6 +179,7 @@ export default function ProductList() {
         <button
           onClick={() => {
             setEditing(null);
+            setVariantParent(null);
             setScannedSku('');
             setFormOpen(true);
           }}
@@ -209,74 +250,179 @@ export default function ProductList() {
             </thead>
             <tbody>
               <AnimatePresence initial={false}>
-                {products.map((p) => (
-                  <motion.tr
-                    key={p.id}
-                    layout
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
-                          {p.imageUrl ? (
-                            <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <IconBox className="h-4 w-4 text-slate-300" />
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-medium text-slate-800">{p.name}</div>
-                          {p.sku && <div className="text-xs text-slate-400">SKU: {p.sku}</div>}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">{p.category}</td>
-                    <td className="px-4 py-3 text-slate-700">{currency(p.price)}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          p.lowStock
-                            ? 'bg-amber-50 text-amber-700'
-                            : 'bg-emerald-50 text-emerald-700'
-                        }`}
+                {products.map((p) => {
+                  const hasVariants = Boolean(p.variants && p.variants.length > 0);
+                  const isExpanded = expanded.has(p.id);
+                  return (
+                    <Fragment key={p.id}>
+                      <motion.tr
+                        layout
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60"
                       >
-                        {p.lowStock && <IconAlertTriangle className="h-3.5 w-3.5" />}
-                        {p.stock} {p.unit}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1.5">
-                        <motion.button
-                          whileTap={{ scale: 0.93 }}
-                          onClick={() => setMovementProduct(p)}
-                          className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50"
-                        >
-                          Movimiento
-                        </motion.button>
-                        <motion.button
-                          whileTap={{ scale: 0.93 }}
-                          onClick={() => {
-                            setEditing(p);
-                            setFormOpen(true);
-                          }}
-                          className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100"
-                        >
-                          Editar
-                        </motion.button>
-                        <motion.button
-                          whileTap={{ scale: 0.93 }}
-                          onClick={() => setDeleteTarget(p)}
-                          className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-rose-500 hover:bg-rose-50"
-                        >
-                          Eliminar
-                        </motion.button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            {hasVariants ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleExpanded(p.id)}
+                                className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100"
+                                aria-label={isExpanded ? 'Contraer variantes' : 'Expandir variantes'}
+                              >
+                                {p.imageUrl ? (
+                                  <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
+                                ) : (
+                                  <IconBox className="h-4 w-4 text-slate-300" />
+                                )}
+                              </button>
+                            ) : (
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                                {p.imageUrl ? (
+                                  <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
+                                ) : (
+                                  <IconBox className="h-4 w-4 text-slate-300" />
+                                )}
+                              </div>
+                            )}
+                            <div>
+                              <div className="flex items-center gap-1.5 font-medium text-slate-800">
+                                {p.name}
+                                {hasVariants && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleExpanded(p.id)}
+                                    className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 hover:bg-slate-200"
+                                  >
+                                    {p.variants.length} variantes
+                                    <motion.span animate={{ rotate: isExpanded ? 180 : 0 }}>
+                                      <IconChevronDown className="h-3 w-3" />
+                                    </motion.span>
+                                  </button>
+                                )}
+                              </div>
+                              {p.sku && <div className="text-xs text-slate-400">SKU: {p.sku}</div>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">{p.category}</td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {hasVariants ? 'Varía' : currency(p.price)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              p.lowStock
+                                ? 'bg-amber-50 text-amber-700'
+                                : 'bg-emerald-50 text-emerald-700'
+                            }`}
+                          >
+                            {p.lowStock && <IconAlertTriangle className="h-3.5 w-3.5" />}
+                            {p.stock} {p.unit}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-1.5">
+                            {!hasVariants && (
+                              <motion.button
+                                whileTap={{ scale: 0.93 }}
+                                onClick={() => setMovementProduct(p)}
+                                className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50"
+                              >
+                                Movimiento
+                              </motion.button>
+                            )}
+                            <motion.button
+                              whileTap={{ scale: 0.93 }}
+                              onClick={() => openNewVariant(p)}
+                              className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50"
+                            >
+                              + Variante
+                            </motion.button>
+                            <motion.button
+                              whileTap={{ scale: 0.93 }}
+                              onClick={() => {
+                                setEditing(p);
+                                setVariantParent(null);
+                                setFormOpen(true);
+                              }}
+                              className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100"
+                            >
+                              Editar
+                            </motion.button>
+                            <motion.button
+                              whileTap={{ scale: 0.93 }}
+                              onClick={() => setDeleteTarget(p)}
+                              className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-rose-500 hover:bg-rose-50"
+                            >
+                              Eliminar
+                            </motion.button>
+                          </div>
+                        </td>
+                      </motion.tr>
+
+                      {hasVariants && isExpanded && (
+                        <AnimatePresence initial={false}>
+                          {p.variants.map((v) => (
+                            <motion.tr
+                              key={v.id}
+                              layout
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="border-b border-slate-50 bg-slate-50/40 last:border-0 hover:bg-slate-100/60"
+                            >
+                              <td className="px-4 py-2.5 pl-14">
+                                <div className="font-medium text-slate-700">{v.variantName}</div>
+                                {v.sku && <div className="text-xs text-slate-400">SKU: {v.sku}</div>}
+                              </td>
+                              <td className="px-4 py-2.5 text-slate-400">—</td>
+                              <td className="px-4 py-2.5 text-slate-700">{currency(v.price)}</td>
+                              <td className="px-4 py-2.5">
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                    v.lowStock
+                                      ? 'bg-amber-50 text-amber-700'
+                                      : 'bg-emerald-50 text-emerald-700'
+                                  }`}
+                                >
+                                  {v.lowStock && <IconAlertTriangle className="h-3.5 w-3.5" />}
+                                  {v.stock} {v.unit}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5">
+                                <div className="flex justify-end gap-1.5">
+                                  <motion.button
+                                    whileTap={{ scale: 0.93 }}
+                                    onClick={() => setMovementProduct(v)}
+                                    className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50"
+                                  >
+                                    Movimiento
+                                  </motion.button>
+                                  <motion.button
+                                    whileTap={{ scale: 0.93 }}
+                                    onClick={() => openEditVariant(p, v)}
+                                    className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100"
+                                  >
+                                    Editar
+                                  </motion.button>
+                                  <motion.button
+                                    whileTap={{ scale: 0.93 }}
+                                    onClick={() => setDeleteTarget(v)}
+                                    className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-rose-500 hover:bg-rose-50"
+                                  >
+                                    Eliminar
+                                  </motion.button>
+                                </div>
+                              </td>
+                            </motion.tr>
+                          ))}
+                        </AnimatePresence>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </AnimatePresence>
             </tbody>
           </table>
@@ -295,12 +441,9 @@ export default function ProductList() {
       <ProductFormModal
         open={formOpen}
         product={editing}
+        variantParent={variantParent}
         initialSku={scannedSku}
-        onClose={() => {
-          setFormOpen(false);
-          setEditing(null);
-          setScannedSku('');
-        }}
+        onClose={closeForm}
         onSubmit={handleCreateOrUpdate}
       />
 
