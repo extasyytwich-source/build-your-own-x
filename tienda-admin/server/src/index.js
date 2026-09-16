@@ -19,8 +19,11 @@ import { reportsRouter } from './routes/reports.js';
 import { settingsRouter } from './routes/settings.js';
 import { employeesRouter } from './routes/employees.js';
 import { salesRouter } from './routes/sales.js';
+import { telegramRouter } from './routes/telegram.js';
+import { telegramWebhookRouter } from './routes/telegramWebhook.js';
 import { eventsRouter } from './routes/events.js';
 import { requireActiveSubscription } from './billing.js';
+import { registerWebhook } from './telegram.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Cuando el cliente ya está compilado (npm run build, o el modo producción
@@ -104,6 +107,10 @@ export function createApp() {
   app.use('/api/employees', requireAuth, requireActiveSubscription, requireOwner, employeesRouter);
   // Cobrar es lo único que necesita el cajero: compartido entre owner y cajero.
   app.use('/api/sales', requireAuth, requireActiveSubscription, salesRouter);
+  // El webhook (público, lo llama Telegram) va montado antes que las rutas
+  // de dueño con el mismo prefijo, para que no le apliquen requireAuth.
+  app.use('/api/telegram/webhook', telegramWebhookRouter);
+  app.use('/api/telegram', requireAuth, requireActiveSubscription, requireOwner, telegramRouter);
 
   if (hasClientBuild) {
     app.use(express.static(clientDist));
@@ -124,6 +131,9 @@ export function createApp() {
 export async function startServer(options = {}) {
   const app = createApp();
   await ready();
+  // Sin efecto si no hay TELEGRAM_BOT_TOKEN o PUBLIC_URL (típico en
+  // desarrollo local, donde Telegram no puede llamar a localhost).
+  registerWebhook(process.env.PUBLIC_URL);
   const requestedPort = options.port ?? (process.env.PORT ? Number(process.env.PORT) : 4000);
 
   return new Promise((resolve, reject) => {

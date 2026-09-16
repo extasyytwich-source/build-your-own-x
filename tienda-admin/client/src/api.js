@@ -97,6 +97,10 @@ export const api = {
   createEmployee: (data) => request('/employees', { method: 'POST', body: data }),
   deleteEmployee: (id) => request(`/employees/${id}`, { method: 'DELETE' }),
 
+  getTelegramStatus: () => request('/telegram'),
+  connectTelegram: () => request('/telegram/connect', { method: 'POST' }),
+  disconnectTelegram: () => request('/telegram/disconnect', { method: 'POST' }),
+
   downloadBackup: () => downloadFile('/settings/backup', `mostrador-respaldo-${todayStamp()}.json`),
   exportProductsCsv: () => downloadFile('/products/export.csv', 'productos.csv'),
   exportMovementsCsv: () => downloadFile('/movements/export.csv', 'movimientos.csv'),
