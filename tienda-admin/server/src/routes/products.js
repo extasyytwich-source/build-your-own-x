@@ -1,10 +1,27 @@
 import { Router } from 'express';
+import PDFDocument from 'pdfkit';
+import bwipjs from 'bwip-js';
 import { pool } from '../db.js';
 import { toCsv, sendCsv } from '../csv.js';
 import { broadcast } from '../events.js';
 import { requireOwner } from '../auth.js';
 
 export const productsRouter = Router();
+
+function formatClp(n) {
+  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(n || 0);
+}
+
+async function renderBarcodePng(text) {
+  return bwipjs.toBuffer({
+    bcid: 'code128',
+    text,
+    scale: 3,
+    height: 10,
+    includetext: false,
+    backgroundcolor: 'FFFFFF',
+  });
+}
 
 function serializeProduct(row, variantRows = null) {
   const product = {
@@ -152,6 +169,81 @@ productsRouter.get('/export.csv', requireOwner, async (req, res) => {
     [req.businessId]
   );
   sendCsv(res, 'productos.csv', toCsv(rows, PRODUCT_EXPORT_COLUMNS));
+});
+
+// Hoja de etiquetas para imprimir y pegar en la tienda: nombre, precio y
+// código de barras (a partir del SKU) de cada producto/variante elegido,
+// repetido tantas veces como copias se pidan. Sin SKU no hay barras que
+// generar — se avisa en la etiqueta en vez de bloquear toda la hoja.
+productsRouter.get('/labels.pdf', requireOwner, async (req, res) => {
+  const ids = String(req.query.ids || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (ids.length === 0) return res.status(400).json({ error: 'Selecciona al menos un producto' });
+
+  const copies = Math.min(Math.max(Number(req.query.copies) || 1, 1), 50);
+
+  const { rows } = await pool.query('SELECT * FROM products WHERE business_id = $1 AND id = ANY($2)', [
+    req.businessId,
+    ids,
+  ]);
+  if (rows.length === 0) return res.status(404).json({ error: 'No se encontraron productos' });
+
+  const byId = new Map(rows.map((r) => [String(r.id), r]));
+  const items = [];
+  for (const id of ids) {
+    const row = byId.get(id);
+    if (!row) continue;
+    for (let i = 0; i < copies; i++) items.push(row);
+  }
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'inline; filename="etiquetas.pdf"');
+
+  const doc = new PDFDocument({ size: 'A4', margin: 20 });
+  doc.pipe(res);
+
+  const cols = 3;
+  const rowsPerPage = 8;
+  const labelWidth = (doc.page.width - 40) / cols;
+  const labelHeight = (doc.page.height - 40) / rowsPerPage;
+  const perPage = cols * rowsPerPage;
+
+  for (let i = 0; i < items.length; i++) {
+    const product = items[i];
+    const posInPage = i % perPage;
+    if (i > 0 && posInPage === 0) doc.addPage();
+
+    const col = posInPage % cols;
+    const row = Math.floor(posInPage / cols);
+    const x = 20 + col * labelWidth;
+    const y = 20 + row * labelHeight;
+
+    doc.rect(x, y, labelWidth, labelHeight).strokeColor('#ddd').lineWidth(0.5).stroke();
+
+    doc
+      .fillColor('#000')
+      .fontSize(9)
+      .text(product.name, x + 6, y + 6, { width: labelWidth - 12, height: 22, ellipsis: true });
+    doc.fontSize(10).text(formatClp(product.price), x + 6, y + 24, { width: labelWidth - 12 });
+
+    if (product.sku) {
+      try {
+        const png = await renderBarcodePng(product.sku);
+        doc.image(png, x + 6, y + 42, { width: labelWidth - 12, height: labelHeight - 50 });
+      } catch {
+        doc.fontSize(7).fillColor('#999').text(`SKU: ${product.sku}`, x + 6, y + 45);
+      }
+    } else {
+      doc
+        .fontSize(7)
+        .fillColor('#999')
+        .text('Sin SKU — sin código de barras', x + 6, y + 45, { width: labelWidth - 12 });
+    }
+  }
+
+  doc.end();
 });
 
 productsRouter.get('/:id', async (req, res) => {

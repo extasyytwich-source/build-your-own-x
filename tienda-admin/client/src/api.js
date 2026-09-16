@@ -72,6 +72,8 @@ export const api = {
   deleteProduct: (id) => request(`/products/${id}`, { method: 'DELETE' }),
   createProductVariant: (productId, data) =>
     request(`/products/${productId}/variants`, { method: 'POST', body: data }),
+  printProductLabels: (ids, copies) =>
+    openFile(`/products/labels.pdf?ids=${ids.join(',')}&copies=${copies}`),
 
   getMovements: (params = {}) => {
     const qs = new URLSearchParams(params).toString();

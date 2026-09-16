@@ -36,6 +36,9 @@ export default function ProductList() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [expanded, setExpanded] = useState(() => new Set());
+  const [selected, setSelected] = useState(() => new Set());
+  const [labelCopies, setLabelCopies] = useState(1);
+  const [printingLabels, setPrintingLabels] = useState(false);
 
   function toggleExpanded(id) {
     setExpanded((prev) => {
@@ -44,6 +47,26 @@ export default function ProductList() {
       else next.add(id);
       return next;
     });
+  }
+
+  function toggleSelected(id) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handlePrintLabels() {
+    setPrintingLabels(true);
+    try {
+      await api.printProductLabels([...selected], labelCopies);
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setPrintingLabels(false);
+    }
   }
 
   const { handleUnauthorized } = useAuth();
@@ -236,11 +259,47 @@ export default function ProductList() {
         )}
       </div>
 
+      {selected.size > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-slate-800 px-4 py-3 text-sm text-white"
+        >
+          <span className="font-medium">{selected.size} seleccionados</span>
+          <label className="flex items-center gap-1.5 text-slate-300">
+            Copias por etiqueta
+            <input
+              type="number"
+              min="1"
+              max="50"
+              className="w-16 rounded-md border-0 bg-slate-700 px-2 py-1 text-white"
+              value={labelCopies}
+              onChange={(e) => setLabelCopies(Math.min(Math.max(Number(e.target.value) || 1, 1), 50))}
+            />
+          </label>
+          <button
+            onClick={handlePrintLabels}
+            disabled={printingLabels}
+            className="ml-auto flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-100"
+          >
+            <IconBarcode className="h-3.5 w-3.5" />
+            {printingLabels ? 'Generando…' : 'Imprimir etiquetas'}
+          </button>
+          <button
+            onClick={() => setSelected(new Set())}
+            className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white"
+          >
+            Cancelar
+          </button>
+        </motion.div>
+      )}
+
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-100 bg-slate-50/70 text-xs uppercase tracking-wide text-slate-400">
               <tr>
+                <th className="w-8 px-4 py-3"></th>
                 <th className="px-4 py-3">Producto</th>
                 <th className="px-4 py-3">Categoría</th>
                 <th className="px-4 py-3">Precio</th>
@@ -262,6 +321,16 @@ export default function ProductList() {
                         exit={{ opacity: 0 }}
                         className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60"
                       >
+                        <td className="px-4 py-3">
+                          {!hasVariants && (
+                            <input
+                              type="checkbox"
+                              checked={selected.has(p.id)}
+                              onChange={() => toggleSelected(p.id)}
+                              aria-label={`Seleccionar ${p.name}`}
+                            />
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             {hasVariants ? (
@@ -373,7 +442,15 @@ export default function ProductList() {
                               exit={{ opacity: 0 }}
                               className="border-b border-slate-50 bg-slate-50/40 last:border-0 hover:bg-slate-100/60"
                             >
-                              <td className="px-4 py-2.5 pl-14">
+                              <td className="px-4 py-2.5">
+                                <input
+                                  type="checkbox"
+                                  checked={selected.has(v.id)}
+                                  onChange={() => toggleSelected(v.id)}
+                                  aria-label={`Seleccionar ${v.name}`}
+                                />
+                              </td>
+                              <td className="px-4 py-2.5 pl-10">
                                 <div className="font-medium text-slate-700">{v.variantName}</div>
                                 {v.sku && <div className="text-xs text-slate-400">SKU: {v.sku}</div>}
                               </td>
