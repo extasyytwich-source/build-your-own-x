@@ -14,11 +14,33 @@ import {
   verifyGoogleIdToken,
   findOrCreateGoogleUser,
   verifyQrToken,
+  lookupBusiness,
 } from '../auth.js';
 
 export const authRouter = Router();
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Primer paso al iniciar sesión: identificar la tienda por su nombre (o su
+// código, si dos negocios sin relación eligieron el mismo nombre), antes de
+// elegir "soy dueño o empleado". Público (nadie inició sesión todavía).
+authRouter.get('/business-lookup', async (req, res) => {
+  const { q } = req.query ?? {};
+  if (!q || !String(q).trim()) {
+    return res.status(400).json({ error: 'Escribe el nombre de tu negocio' });
+  }
+
+  const result = await lookupBusiness(q);
+  if (result.ambiguous) {
+    return res.status(409).json({
+      error: 'Hay más de un negocio con ese nombre. Usa el código de tienda que te dio el dueño en su lugar.',
+    });
+  }
+  if (!result.match) {
+    return res.status(404).json({ error: 'No encontramos ningún negocio con ese nombre o código' });
+  }
+  res.json({ name: result.match.name, storeCode: result.match.store_code });
+});
 
 authRouter.post('/signup', async (req, res) => {
   const { businessName, email, password } = req.body ?? {};

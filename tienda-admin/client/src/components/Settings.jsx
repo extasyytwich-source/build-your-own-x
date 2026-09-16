@@ -403,15 +403,17 @@ export default function Settings() {
           Empleados
         </h2>
         <p className="mb-4 text-xs text-slate-500">
-          Cada empleado entra con su propio usuario y contraseña, o escaneando su código QR
-          (ícono junto a su nombre), directo a la pantalla de Caja — no ve productos, historial,
-          reportes ni ajustes.
+          Al iniciar sesión, primero se escribe el nombre del negocio y recién ahí aparece el
+          menú de rol. Un empleado entra con su propio usuario y contraseña, o escaneando su
+          código QR (ícono junto a su nombre), directo a la pantalla de Caja — no ve productos,
+          historial, reportes ni ajustes.
         </p>
 
         {storeCode && (
           <div className="mb-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
             <span className="text-slate-600">
-              Código de tienda <span className="text-xs text-slate-400">(para el login manual)</span>
+              Código de tienda{' '}
+              <span className="text-xs text-slate-400">(si hay otro negocio con el mismo nombre)</span>
             </span>
             <span className="font-mono font-semibold tracking-wide text-slate-800">{storeCode}</span>
           </div>
