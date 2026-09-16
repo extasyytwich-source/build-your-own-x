@@ -149,6 +149,18 @@ export const api = {
   receivePurchaseOrder: (id) => request(`/purchase-orders/${id}/receive`, { method: 'POST' }),
   cancelPurchaseOrder: (id) => request(`/purchase-orders/${id}/cancel`, { method: 'POST' }),
   deletePurchaseOrder: (id) => request(`/purchase-orders/${id}`, { method: 'DELETE' }),
+
+  getDteSettings: () => request('/dte/settings'),
+  updateDteSettings: (data) => request('/dte/settings', { method: 'PUT', body: data }),
+  getDteCafs: () => request('/dte/cafs'),
+  uploadDteCaf: (xml) => request('/dte/cafs', { method: 'POST', body: { xml } }),
+  deleteDteCaf: (id) => request(`/dte/cafs/${id}`, { method: 'DELETE' }),
+  getDteDocuments: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/dte/documents${qs ? `?${qs}` : ''}`);
+  },
+  createDteDocument: (saleId) => request('/dte/documents', { method: 'POST', body: { saleId } }),
+  viewDteDocument: (id) => openFile(`/dte/documents/${id}/pdf`),
 };
 
 function todayStamp() {

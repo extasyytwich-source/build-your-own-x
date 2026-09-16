@@ -17,6 +17,7 @@ import {
   IconCheckCircle,
   IconQrCode,
   IconStore,
+  IconReceipt,
 } from './icons.jsx';
 
 const SUBSCRIPTION_LABELS = {
@@ -76,6 +77,14 @@ export default function Settings() {
   const [editingLocation, setEditingLocation] = useState(null);
   const [editLocationName, setEditLocationName] = useState('');
   const [deleteLocationTarget, setDeleteLocationTarget] = useState(null);
+
+  const [dteSettings, setDteSettings] = useState(null);
+  const [dteForm, setDteForm] = useState({ rut: '', businessName: '', giro: '', address: '', environment: 'certificacion' });
+  const [savingDteSettings, setSavingDteSettings] = useState(false);
+  const [dteCafs, setDteCafs] = useState([]);
+  const [uploadingCaf, setUploadingCaf] = useState(false);
+  const [deleteCafTarget, setDeleteCafTarget] = useState(null);
+  const cafInputRef = useRef(null);
   const pollRef = useRef(null);
 
   const panelUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -90,6 +99,23 @@ export default function Settings() {
 
   function loadLocations() {
     api.getLocations().then(setLocations).catch(() => {});
+  }
+
+  function loadDteSettings() {
+    api.getDteSettings().then((settings) => {
+      setDteSettings(settings);
+      setDteForm({
+        rut: settings.rut,
+        businessName: settings.businessName,
+        giro: settings.giro,
+        address: settings.address,
+        environment: settings.environment,
+      });
+    }).catch(() => {});
+  }
+
+  function loadDteCafs() {
+    api.getDteCafs().then(setDteCafs).catch(() => {});
   }
 
   async function handleCreateLocation(e) {
@@ -131,6 +157,49 @@ export default function Settings() {
     }
   }
 
+  async function handleSaveDteSettings(e) {
+    e.preventDefault();
+    setSavingDteSettings(true);
+    try {
+      setDteSettings(await api.updateDteSettings(dteForm));
+      notify('Datos de facturación guardados');
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setSavingDteSettings(false);
+    }
+  }
+
+  function handlePickCaf(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingCaf(true);
+    file
+      .text()
+      .then((xml) => api.uploadDteCaf(xml))
+      .then(() => {
+        notify('CAF cargado');
+        loadDteCafs();
+      })
+      .catch((err) => notify(err.message, 'error'))
+      .finally(() => {
+        setUploadingCaf(false);
+        if (cafInputRef.current) cafInputRef.current.value = '';
+      });
+  }
+
+  async function handleDeleteCaf() {
+    try {
+      await api.deleteDteCaf(deleteCafTarget.id);
+      notify('CAF eliminado');
+      loadDteCafs();
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setDeleteCafTarget(null);
+    }
+  }
+
   useEffect(() => {
     api.getAiSettings().then(setAiStatus).catch(() => {});
     api.getBillingStatus().then(setBilling).catch(() => {});
@@ -141,6 +210,8 @@ export default function Settings() {
     loadEmployees();
     loadTelegramStatus();
     loadLocations();
+    loadDteSettings();
+    loadDteCafs();
     return () => clearInterval(pollRef.current);
   }, []);
 
@@ -665,6 +736,109 @@ export default function Settings() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.095 }}
+        className="card mt-6 max-w-sm p-6"
+      >
+        <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+          <IconReceipt className="h-4 w-4" />
+          Facturación electrónica (SII)
+        </h2>
+        <p className="mb-4 text-xs text-slate-500">
+          Estructura base para boleta/factura electrónica: guarda los datos tributarios del
+          negocio y lleva la cuenta de folios de un CAF que subas. Los documentos que genera
+          quedan marcados como <strong>borrador</strong> — para timbrar documentos válidos ante el
+          SII hace falta además el certificado digital del negocio, que este panel todavía no
+          soporta.
+        </p>
+
+        <form onSubmit={handleSaveDteSettings} className="mb-4 space-y-3">
+          <input
+            className="input"
+            placeholder="RUT del negocio"
+            value={dteForm.rut}
+            onChange={(e) => setDteForm({ ...dteForm, rut: e.target.value })}
+          />
+          <input
+            className="input"
+            placeholder="Razón social"
+            value={dteForm.businessName}
+            onChange={(e) => setDteForm({ ...dteForm, businessName: e.target.value })}
+          />
+          <input
+            className="input"
+            placeholder="Giro"
+            value={dteForm.giro}
+            onChange={(e) => setDteForm({ ...dteForm, giro: e.target.value })}
+          />
+          <input
+            className="input"
+            placeholder="Dirección"
+            value={dteForm.address}
+            onChange={(e) => setDteForm({ ...dteForm, address: e.target.value })}
+          />
+          <div>
+            <label className="label">Ambiente</label>
+            <select
+              className="input"
+              value={dteForm.environment}
+              onChange={(e) => setDteForm({ ...dteForm, environment: e.target.value })}
+            >
+              <option value="certificacion">Certificación (pruebas)</option>
+              <option value="produccion">Producción</option>
+            </select>
+          </div>
+          <button type="submit" disabled={savingDteSettings} className="btn-secondary w-full">
+            {savingDteSettings ? 'Guardando…' : 'Guardar datos'}
+          </button>
+        </form>
+
+        <div className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">
+          CAF (folios autorizados por el SII)
+        </div>
+        {dteCafs.length > 0 && (
+          <ul className="mb-3 space-y-1.5">
+            {dteCafs.map((caf) => (
+              <li
+                key={caf.id}
+                className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm"
+              >
+                <span>
+                  <span className="font-medium text-slate-700">{caf.documentTypeLabel}</span>
+                  <span className="ml-2 text-xs text-slate-400">
+                    folios {caf.folioFrom}–{caf.folioTo} · quedan {caf.foliosLeft}
+                  </span>
+                </span>
+                <button
+                  onClick={() => setDeleteCafTarget(caf)}
+                  className="text-slate-300 hover:text-rose-500"
+                  aria-label={`Quitar CAF ${caf.documentTypeLabel}`}
+                >
+                  <IconX className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <button
+          onClick={() => cafInputRef.current?.click()}
+          disabled={uploadingCaf}
+          className="btn-secondary w-full"
+        >
+          <IconUpload className="h-4 w-4" />
+          {uploadingCaf ? 'Cargando…' : 'Subir CAF (.xml)'}
+        </button>
+        <input
+          ref={cafInputRef}
+          type="file"
+          accept=".xml"
+          className="hidden"
+          onChange={handlePickCaf}
+        />
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
         className="card mt-6 max-w-sm p-6"
       >
@@ -880,6 +1054,14 @@ export default function Settings() {
         onConfirm={handleDeleteLocation}
         title="Eliminar sucursal"
         message={`¿Eliminar "${deleteLocationTarget?.name}"? Solo se puede si ya no tiene stock de ningún producto.`}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteCafTarget)}
+        onClose={() => setDeleteCafTarget(null)}
+        onConfirm={handleDeleteCaf}
+        title="Eliminar CAF"
+        message={`¿Eliminar el CAF de ${deleteCafTarget?.documentTypeLabel}? Solo se puede si todavía no se generó ningún documento con él.`}
       />
     </div>
   );

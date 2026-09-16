@@ -4,7 +4,14 @@ import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useLiveUpdates } from '../context/LiveUpdatesContext.jsx';
-import { IconPlusCircle, IconMinusCircle, IconWrench, IconReceipt, IconFileText, IconX } from './icons.jsx';
+import {
+  IconPlusCircle,
+  IconMinusCircle,
+  IconWrench,
+  IconReceipt,
+  IconFileText,
+  IconX,
+} from './icons.jsx';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import EmptyState from './EmptyState.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
@@ -25,6 +32,8 @@ export default function MovementHistory() {
   const [generatingId, setGeneratingId] = useState(null);
   const [refundTarget, setRefundTarget] = useState(null);
   const [refunding, setRefunding] = useState(false);
+  const [dteBySale, setDteBySale] = useState({});
+  const [generatingDteSaleId, setGeneratingDteSaleId] = useState(null);
 
   async function handleViewInvoice(movementId) {
     setGeneratingId(movementId);
@@ -65,12 +74,45 @@ export default function MovementHistory() {
       .finally(() => setLoading(false));
   }
 
+  // Boleta/factura electrónica: se genera bajo demanda (no una por venta
+  // automáticamente), así que se guarda por saleId la que ya exista para
+  // decidir si mostrar "Generar boleta" o el enlace al borrador ya emitido.
+  function loadDteDocuments() {
+    api
+      .getDteDocuments()
+      .then((docs) => {
+        const bySale = {};
+        for (const doc of docs) {
+          if (doc.saleId && !bySale[doc.saleId]) bySale[doc.saleId] = doc;
+        }
+        setDteBySale(bySale);
+      })
+      .catch(() => {});
+  }
+
+  async function handleGenerateDte(saleId) {
+    setGeneratingDteSaleId(saleId);
+    try {
+      const doc = await api.createDteDocument(saleId);
+      setDteBySale((prev) => ({ ...prev, [saleId]: doc }));
+      await api.viewDteDocument(doc.id);
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setGeneratingDteSaleId(null);
+    }
+  }
+
   useEffect(() => {
     loadMovements();
     // Se vuelve a pedir también cuando otra pantalla conectada (la caja, el
     // teléfono) registra un movimiento, para que el historial se vea al día.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, lastEvent]);
+
+  useEffect(() => {
+    loadDteDocuments();
+  }, []);
 
   return (
     <div>
@@ -147,6 +189,24 @@ export default function MovementHistory() {
                               >
                                 <IconX className="h-3.5 w-3.5" />
                                 Devolver
+                              </button>
+                            )
+                          )}
+                          {m.type === 'salida' && m.saleId && (
+                            dteBySale[m.saleId] ? (
+                              <button
+                                onClick={() => api.viewDteDocument(dteBySale[m.saleId].id)}
+                                className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 underline hover:text-slate-800"
+                              >
+                                Boleta N° {dteBySale[m.saleId].folio}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleGenerateDte(m.saleId)}
+                                disabled={generatingDteSaleId === m.saleId}
+                                className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 underline hover:text-slate-800"
+                              >
+                                {generatingDteSaleId === m.saleId ? 'Generando…' : 'Generar boleta'}
                               </button>
                             )
                           )}
