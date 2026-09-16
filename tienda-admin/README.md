@@ -151,6 +151,26 @@ cd tienda-admin/client && npm run build   # genera client/dist
 cd ../server && npm start                 # sirve la API + el cliente compilado
 ```
 
+### Pruebas automatizadas
+
+El servidor tiene una suite con `node --test` (sin dependencias nuevas):
+pruebas unitarias de las funciones puras (impuestos, lectura de CAF) y
+pruebas de integración que levantan la API real en un puerto libre y le
+pegan por HTTP, contra una base Postgres de prueba.
+
+```bash
+cd tienda-admin/server
+createdb mostrador_test        # una vez, cualquier base vacía sirve
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/mostrador_test \
+JWT_SECRET=test-secret \
+npm test
+```
+
+Las migraciones se aplican solas al arrancar, igual que en desarrollo — no
+hace falta correrlas a mano. `.github/workflows/tienda-admin-ci.yml` corre
+esta misma suite (con un Postgres de servicio) y el build del cliente en
+cada push/PR que toque `tienda-admin/`.
+
 ## Desplegar en internet
 
 Ver [`DEPLOY.md`](./DEPLOY.md) para la guía paso a paso (Render.com,
