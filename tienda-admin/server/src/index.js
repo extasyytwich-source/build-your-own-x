@@ -21,6 +21,7 @@ import { employeesRouter } from './routes/employees.js';
 import { salesRouter } from './routes/sales.js';
 import { refundsRouter } from './routes/refunds.js';
 import { suppliersRouter } from './routes/suppliers.js';
+import { locationsRouter } from './routes/locations.js';
 import { purchaseOrdersRouter } from './routes/purchaseOrders.js';
 import { telegramRouter } from './routes/telegram.js';
 import { telegramWebhookRouter } from './routes/telegramWebhook.js';
@@ -109,6 +110,9 @@ export function createApp() {
   app.use('/api/settings', requireAuth, requireActiveSubscription, requireOwner, settingsRouter);
   app.use('/api/employees', requireAuth, requireActiveSubscription, requireOwner, employeesRouter);
   app.use('/api/suppliers', requireAuth, requireActiveSubscription, requireOwner, suppliersRouter);
+  // Lectura compartida (Caja necesita listar sucursales para elegir dónde
+  // vender); la escritura queda restringida dentro del propio router.
+  app.use('/api/locations', requireAuth, requireActiveSubscription, locationsRouter);
   app.use('/api/purchase-orders', requireAuth, requireActiveSubscription, requireOwner, purchaseOrdersRouter);
   // Cobrar es lo único que necesita el cajero: compartido entre owner y cajero.
   app.use('/api/sales', requireAuth, requireActiveSubscription, salesRouter);

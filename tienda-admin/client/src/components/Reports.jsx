@@ -207,8 +207,13 @@ export default function Reports() {
               ) : (
                 <ul className="divide-y divide-slate-100">
                   {report.restockNeeded.map((p) => (
-                    <li key={p.id} className="flex items-center justify-between py-2.5 text-sm">
-                      <span className="font-medium text-slate-700">{p.name}</span>
+                    <li key={`${p.id}-${p.locationId}`} className="flex items-center justify-between py-2.5 text-sm">
+                      <span className="font-medium text-slate-700">
+                        {p.name}
+                        {report.locationsCount > 1 && (
+                          <span className="ml-1.5 text-xs font-normal text-slate-400">({p.locationName})</span>
+                        )}
+                      </span>
                       <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
                         {p.stock} / {p.minStock} {p.unit}
                       </span>
@@ -233,8 +238,13 @@ export default function Reports() {
               ) : (
                 <ul className="divide-y divide-slate-100">
                   {report.criticalItems.map((p) => (
-                    <li key={p.id} className="flex items-center justify-between py-2.5 text-sm">
-                      <span className="font-medium text-slate-700">{p.name}</span>
+                    <li key={`${p.id}-${p.locationId}`} className="flex items-center justify-between py-2.5 text-sm">
+                      <span className="font-medium text-slate-700">
+                        {p.name}
+                        {report.locationsCount > 1 && (
+                          <span className="ml-1.5 text-xs font-normal text-slate-400">({p.locationName})</span>
+                        )}
+                      </span>
                       <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
                         {p.stock <= 0 ? 'Sin stock' : `${p.stock} ${p.unit}`}
                       </span>

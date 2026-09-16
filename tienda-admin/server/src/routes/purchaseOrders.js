@@ -1,14 +1,15 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
 import { broadcast } from '../events.js';
-import { registerMovement } from './movements.js';
+import { registerMovement, resolveDefaultLocationId } from './movements.js';
 
 export const purchaseOrdersRouter = Router();
 
 const ORDERS_QUERY = `
-  SELECT purchase_orders.*, suppliers.name AS supplier_name
+  SELECT purchase_orders.*, suppliers.name AS supplier_name, locations.name AS location_name
   FROM purchase_orders
   JOIN suppliers ON suppliers.id = purchase_orders.supplier_id
+  LEFT JOIN locations ON locations.id = purchase_orders.location_id
 `;
 
 function serializeOrder(row, items = null) {
@@ -20,6 +21,8 @@ function serializeOrder(row, items = null) {
     notes: row.notes,
     createdAt: row.created_at,
     receivedAt: row.received_at,
+    locationId: row.location_id,
+    locationName: row.location_name,
   };
   if (items) {
     order.items = items.map((i) => ({
@@ -74,7 +77,7 @@ purchaseOrdersRouter.get('/:id', async (req, res) => {
 // Crea la orden en estado "pendiente": todavía no toca stock. Recién al
 // recibirla (POST /:id/receive) se generan los movimientos de entrada.
 purchaseOrdersRouter.post('/', async (req, res) => {
-  const { supplierId, notes, items } = req.body ?? {};
+  const { supplierId, notes, items, locationId } = req.body ?? {};
   if (!supplierId) return res.status(400).json({ error: 'Selecciona un proveedor' });
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'Agrega al menos un producto a la orden' });
@@ -95,10 +98,11 @@ purchaseOrdersRouter.post('/', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const resolvedLocationId = locationId || (await resolveDefaultLocationId(client, req.businessId));
     const { rows: orderRows } = await client.query(
-      `INSERT INTO purchase_orders (business_id, supplier_id, notes, created_by)
-       VALUES ($1, $2, $3, $4) RETURNING id`,
-      [req.businessId, supplierId, notes || null, req.userId]
+      `INSERT INTO purchase_orders (business_id, supplier_id, notes, created_by, location_id)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [req.businessId, supplierId, notes || null, req.userId, resolvedLocationId]
     );
     const orderId = orderRows[0].id;
 
@@ -168,7 +172,7 @@ purchaseOrdersRouter.post('/:id/receive', async (req, res) => {
         'entrada',
         Number(item.quantity),
         `Orden de compra #${order.id}`,
-        { purchaseOrderId: order.id }
+        { purchaseOrderId: order.id, locationId: order.location_id }
       );
     }
 

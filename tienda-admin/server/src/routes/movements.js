@@ -23,15 +23,33 @@ function serializeMovement(row) {
     saleId: row.sale_id,
     refundId: row.refund_id,
     refunded: Boolean(row.refunded),
+    locationId: row.location_id,
+    locationName: row.location_name,
   };
 }
 
 const MOVEMENTS_QUERY = `
-  SELECT movements.*, products.name AS product_name,
+  SELECT movements.*, products.name AS product_name, locations.name AS location_name,
     EXISTS (SELECT 1 FROM movements r WHERE r.refunded_from_id = movements.id) AS refunded
   FROM movements
   JOIN products ON products.id = movements.product_id
+  LEFT JOIN locations ON locations.id = movements.location_id
 `;
+
+// Ubicación a usar cuando no se especifica ninguna (negocios con una sola
+// sucursal no necesitan elegir explícitamente en cada movimiento/venta).
+export async function resolveDefaultLocationId(client, businessId) {
+  const { rows } = await client.query(
+    'SELECT id FROM locations WHERE business_id = $1 AND is_default = true LIMIT 1',
+    [businessId]
+  );
+  if (!rows[0]) {
+    const err = new Error('El negocio no tiene ninguna ubicación configurada');
+    err.status = 500;
+    throw err;
+  }
+  return rows[0].id;
+}
 
 movementsRouter.get('/', async (req, res) => {
   const { productId, type, limit } = req.query;
@@ -62,6 +80,7 @@ movementsRouter.get('/export.csv', async (req, res) => {
   const csv = toCsv(rows, [
     { label: 'Fecha', value: (r) => r.created_at },
     { label: 'Producto', value: (r) => r.product_name },
+    { label: 'Ubicación', value: (r) => r.location_name },
     { label: 'Tipo', value: (r) => r.type },
     { label: 'Cantidad', value: (r) => r.quantity },
     { label: 'Stock resultante', value: (r) => r.stock_after },
@@ -72,13 +91,18 @@ movementsRouter.get('/export.csv', async (req, res) => {
   sendCsv(res, 'movimientos.csv', csv);
 });
 
-// Exportada para que routes/sales.js y routes/purchaseOrders.js registren
-// cada línea del carrito/orden como el mismo movimiento de siempre,
-// etiquetado con el saleId o purchaseOrderId correspondiente.
+// Exportada para que routes/sales.js, routes/purchaseOrders.js y
+// routes/refunds.js registren cada línea del carrito/orden/devolución como
+// el mismo movimiento de siempre, etiquetado con el saleId/purchaseOrderId/
+// refundId correspondiente.
 // unitPriceOverride: precio ya resuelto (con descuentos de Caja aplicados,
 // si los hay) que reemplaza el precio de catálogo del producto — así queda
 // congelado en el movimiento y los reportes de IVA/ganancia (que leen
 // unit_price de movements) reflejan el descuento sin ningún cambio.
+// locationId: la sucursal cuyo stock se ajusta (por defecto, la principal
+// del negocio). products.stock/min_stock quedan como el AGREGADO de todas
+// las ubicaciones — se recalculan acá mismo, así el resto de la app (que
+// solo lee product.stock) sigue funcionando sin enterarse de sucursales.
 export async function registerMovement(
   client,
   businessId,
@@ -92,6 +116,7 @@ export async function registerMovement(
     unitPriceOverride = null,
     refundId = null,
     refundedFromId = null,
+    locationId = null,
   } = {}
 ) {
   const { rows: productRows } = await client.query(
@@ -105,34 +130,58 @@ export async function registerMovement(
     throw err;
   }
 
-  let newStock;
-  if (type === 'entrada') newStock = product.stock + quantity;
-  else if (type === 'salida') newStock = product.stock - quantity;
-  else newStock = quantity; // ajuste: fija el stock al valor indicado
+  const resolvedLocationId = locationId || (await resolveDefaultLocationId(client, businessId));
 
-  if (newStock < 0) {
-    const err = new Error(`No hay suficiente stock de "${product.name}" para esta salida`);
+  await client.query(
+    `INSERT INTO product_stock (product_id, location_id, stock, min_stock)
+     VALUES ($1, $2, 0, 0)
+     ON CONFLICT (product_id, location_id) DO NOTHING`,
+    [productId, resolvedLocationId]
+  );
+  const { rows: stockRows } = await client.query(
+    'SELECT * FROM product_stock WHERE product_id = $1 AND location_id = $2 FOR UPDATE',
+    [productId, resolvedLocationId]
+  );
+  const locationStock = stockRows[0];
+
+  let newLocationStock;
+  if (type === 'entrada') newLocationStock = Number(locationStock.stock) + quantity;
+  else if (type === 'salida') newLocationStock = Number(locationStock.stock) - quantity;
+  else newLocationStock = quantity; // ajuste: fija el stock de esa ubicación
+
+  if (newLocationStock < 0) {
+    const err = new Error(`No hay suficiente stock de "${product.name}" en esta ubicación`);
     err.status = 400;
     throw err;
   }
 
+  await client.query('UPDATE product_stock SET stock = $1 WHERE product_id = $2 AND location_id = $3', [
+    newLocationStock,
+    productId,
+    resolvedLocationId,
+  ]);
+
+  const { rows: aggRows } = await client.query(
+    'SELECT COALESCE(SUM(stock), 0) AS total FROM product_stock WHERE product_id = $1',
+    [productId]
+  );
   await client.query('UPDATE products SET stock = $1, updated_at = now() WHERE id = $2', [
-    newStock,
+    aggRows[0].total,
     productId,
   ]);
 
   const unitPrice = unitPriceOverride !== null ? unitPriceOverride : product.price;
 
   const { rows } = await client.query(
-    `INSERT INTO movements (business_id, product_id, type, quantity, stock_after, note, unit_price, unit_cost, sale_id, purchase_order_id, refund_id, refunded_from_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    `INSERT INTO movements (business_id, product_id, type, quantity, stock_after, note, unit_price, unit_cost, sale_id, purchase_order_id, refund_id, refunded_from_id, location_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
      RETURNING id`,
     [
       businessId,
       productId,
       type,
       quantity,
-      newStock,
+      newLocationStock,
       note || null,
       unitPrice,
       product.cost,
@@ -140,6 +189,7 @@ export async function registerMovement(
       purchaseOrderId,
       refundId,
       refundedFromId,
+      resolvedLocationId,
     ]
   );
 
@@ -150,7 +200,7 @@ export async function registerMovement(
 }
 
 movementsRouter.post('/', async (req, res) => {
-  const { productId, type, quantity, note } = req.body ?? {};
+  const { productId, type, quantity, note, locationId } = req.body ?? {};
 
   if (!productId || !type || quantity === undefined) {
     return res.status(400).json({ error: 'Faltan datos: producto, tipo y cantidad' });
@@ -166,7 +216,7 @@ movementsRouter.post('/', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const row = await registerMovement(client, req.businessId, productId, type, qty, note);
+    const row = await registerMovement(client, req.businessId, productId, type, qty, note, { locationId });
     await client.query('COMMIT');
 
     const movement = serializeMovement(row);

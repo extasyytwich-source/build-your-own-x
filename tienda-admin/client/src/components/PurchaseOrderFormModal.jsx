@@ -7,13 +7,14 @@ import { api } from '../api.js';
 
 const EMPTY_ITEM = { productId: '', quantity: '', unitCost: '' };
 
-export default function PurchaseOrderFormModal({ open, onClose, onSubmit, suppliers, products }) {
+export default function PurchaseOrderFormModal({ open, onClose, onSubmit, suppliers, products, locations = [] }) {
   const [supplierId, setSupplierId] = useState('');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState([{ ...EMPTY_ITEM }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [shakeControls, shake] = useShake();
+  const [locationId, setLocationId] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -21,8 +22,10 @@ export default function PurchaseOrderFormModal({ open, onClose, onSubmit, suppli
       setNotes('');
       setItems([{ ...EMPTY_ITEM }]);
       setError('');
+      const defaultLocation = locations.find((l) => l.isDefault) || locations[0];
+      setLocationId(defaultLocation ? String(defaultLocation.id) : '');
     }
-  }, [open, suppliers]);
+  }, [open, suppliers, locations]);
 
   function updateItem(index, field, value) {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
@@ -49,6 +52,7 @@ export default function PurchaseOrderFormModal({ open, onClose, onSubmit, suppli
       await onSubmit({
         supplierId: Number(supplierId),
         notes,
+        locationId: locationId ? Number(locationId) : undefined,
         items: items
           .filter((i) => i.productId)
           .map((i) => ({ productId: Number(i.productId), quantity: Number(i.quantity), unitCost: Number(i.unitCost) })),
@@ -79,6 +83,19 @@ export default function PurchaseOrderFormModal({ open, onClose, onSubmit, suppli
             ))}
           </select>
         </div>
+
+        {locations.length > 1 && (
+          <div>
+            <label className="label">Recibir en</label>
+            <select className="input" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+              {locations.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div>
           <label className="label">Productos</label>

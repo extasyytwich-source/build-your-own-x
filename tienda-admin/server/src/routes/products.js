@@ -5,6 +5,7 @@ import { pool } from '../db.js';
 import { toCsv, sendCsv } from '../csv.js';
 import { broadcast } from '../events.js';
 import { requireOwner } from '../auth.js';
+import { resolveDefaultLocationId } from './movements.js';
 
 export const productsRouter = Router();
 
@@ -259,6 +260,28 @@ productsRouter.get('/:id', async (req, res) => {
   res.json(serializeProduct(rows[0]));
 });
 
+// Desglose por sucursal — lo usa el selector de ubicación al registrar un
+// movimiento manual, para mostrar cuánto hay exactamente donde se va a
+// ajustar (no el agregado de products.stock).
+productsRouter.get('/:id/stock', async (req, res) => {
+  const { rows: productRows } = await pool.query(
+    'SELECT id FROM products WHERE business_id = $1 AND id = $2',
+    [req.businessId, req.params.id]
+  );
+  if (!productRows[0]) return res.status(404).json({ error: 'Producto no encontrado' });
+
+  const { rows } = await pool.query(
+    `SELECT locations.id AS location_id, locations.name AS location_name,
+       COALESCE(product_stock.stock, 0) AS stock
+     FROM locations
+     LEFT JOIN product_stock ON product_stock.location_id = locations.id AND product_stock.product_id = $2
+     WHERE locations.business_id = $1
+     ORDER BY locations.is_default DESC, locations.name ASC`,
+    [req.businessId, req.params.id]
+  );
+  res.json(rows.map((r) => ({ locationId: r.location_id, locationName: r.location_name, stock: r.stock })));
+});
+
 productsRouter.post('/', requireOwner, async (req, res) => {
   const { name, sku, category, price, cost, stock, minStock, unit, description, imageUrl, taxCategory } =
     req.body ?? {};
@@ -287,6 +310,12 @@ productsRouter.post('/', requireOwner, async (req, res) => {
         imageUrl || null,
         VALID_TAX_CATEGORIES.includes(taxCategory) ? taxCategory : 'general',
       ]
+    );
+
+    const defaultLocationId = await resolveDefaultLocationId(pool, req.businessId);
+    await pool.query(
+      'INSERT INTO product_stock (product_id, location_id, stock, min_stock) VALUES ($1, $2, $3, $4)',
+      [rows[0].id, defaultLocationId, rows[0].stock, rows[0].min_stock]
     );
 
     const product = serializeProduct(rows[0]);
@@ -349,6 +378,12 @@ productsRouter.post('/:id/variants', requireOwner, async (req, res) => {
       ]
     );
 
+    const defaultLocationId = await resolveDefaultLocationId(pool, req.businessId);
+    await pool.query(
+      'INSERT INTO product_stock (product_id, location_id, stock, min_stock) VALUES ($1, $2, $3, $4)',
+      [rows[0].id, defaultLocationId, rows[0].stock, rows[0].min_stock]
+    );
+
     const variant = serializeProduct(rows[0]);
     broadcast(
       'product',
@@ -392,13 +427,18 @@ productsRouter.put('/:id', requireOwner, async (req, res) => {
     newName = `${parentRows[0].name} (${newVariantName})`;
   }
 
+  // El stock ya no se edita a mano acá — con varias ubicaciones no habría
+  // forma de saber a cuál aplicarle un número suelto. Solo "Registrar
+  // movimiento" (con su propia ubicación) puede cambiarlo.
+  const newMinStock = minStock !== undefined ? Number(minStock) : existing.min_stock;
+
   try {
     const { rows } = await pool.query(
       `UPDATE products SET
         name = $1, sku = $2, category = $3, price = $4, cost = $5,
-        stock = $6, min_stock = $7, unit = $8, description = $9, image_url = $10,
-        tax_category = $11, variant_name = $12, updated_at = now()
-       WHERE business_id = $13 AND id = $14
+        min_stock = $6, unit = $7, description = $8, image_url = $9,
+        tax_category = $10, variant_name = $11, updated_at = now()
+       WHERE business_id = $12 AND id = $13
        RETURNING *`,
       [
         newName,
@@ -406,8 +446,7 @@ productsRouter.put('/:id', requireOwner, async (req, res) => {
         category ?? existing.category,
         price !== undefined ? Number(price) : existing.price,
         cost !== undefined ? Number(cost) : existing.cost,
-        stock !== undefined ? Number(stock) : existing.stock,
-        minStock !== undefined ? Number(minStock) : existing.min_stock,
+        newMinStock,
         unit ?? existing.unit,
         description ?? existing.description,
         imageUrl ?? existing.image_url,
@@ -417,6 +456,13 @@ productsRouter.put('/:id', requireOwner, async (req, res) => {
         req.params.id,
       ]
     );
+
+    if (newMinStock !== existing.min_stock) {
+      await pool.query('UPDATE product_stock SET min_stock = $1 WHERE product_id = $2', [
+        newMinStock,
+        req.params.id,
+      ]);
+    }
 
     // Si se renombró un producto con variantes, sus nombres (que incluyen el
     // del padre) quedan desactualizados — se re-sincronizan de una vez.

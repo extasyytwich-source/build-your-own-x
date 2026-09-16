@@ -24,6 +24,7 @@ export default function Purchases() {
   const [orders, setOrders] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(() => new Set());
 
@@ -45,14 +46,16 @@ export default function Purchases() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [ordersData, suppliersData, productsData] = await Promise.all([
+      const [ordersData, suppliersData, productsData, locationsData] = await Promise.all([
         api.getPurchaseOrders(),
         api.getSuppliers(),
         api.getProducts({ sellable: 1 }),
+        api.getLocations(),
       ]);
       setOrders(ordersData);
       setSuppliers(suppliersData);
       setProducts(productsData);
+      setLocations(locationsData);
     } catch (err) {
       if (err.status === 401) return handleUnauthorized();
       notify(err.message, 'error');
@@ -290,6 +293,9 @@ export default function Purchases() {
                                 </li>
                               ))}
                             </ul>
+                            {locations.length > 1 && order.locationName && (
+                              <p className="mt-2 text-xs text-slate-400">Recibe en: {order.locationName}</p>
+                            )}
                             {order.notes && (
                               <p className="mt-2 text-xs text-slate-400">Notas: {order.notes}</p>
                             )}
@@ -361,6 +367,7 @@ export default function Purchases() {
         onSubmit={handleCreateOrder}
         suppliers={suppliers}
         products={products}
+        locations={locations}
       />
 
       <ConfirmDialog

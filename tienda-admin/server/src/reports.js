@@ -42,20 +42,30 @@ export async function computeMonthlyStats(businessId, month) {
     )
   ).rows[0];
 
+  // Por ubicación, no por el agregado del producto: con varias sucursales,
+  // una puede estar crítica aunque el total entre todas se vea bien.
+  const RESTOCK_QUERY = `
+    SELECT products.id, products.name, products.unit,
+      product_stock.stock, product_stock.min_stock AS "minStock",
+      locations.id AS "locationId", locations.name AS "locationName"
+    FROM product_stock
+    JOIN products ON products.id = product_stock.product_id
+    JOIN locations ON locations.id = product_stock.location_id
+    WHERE products.business_id = $1
+      AND NOT EXISTS (SELECT 1 FROM products c WHERE c.parent_product_id = products.id)
+  `;
+
   const restockNeeded = (
     await pool.query(
-      `SELECT id, name, stock, min_stock AS "minStock", unit
-       FROM products WHERE business_id = $1 AND stock <= min_stock ORDER BY stock ASC`,
+      `${RESTOCK_QUERY} AND product_stock.stock <= product_stock.min_stock ORDER BY product_stock.stock ASC`,
       [businessId]
     )
   ).rows;
 
   const criticalItems = (
     await pool.query(
-      `SELECT id, name, stock, min_stock AS "minStock", unit
-       FROM products
-       WHERE business_id = $1 AND (stock <= 0 OR stock <= (min_stock * 0.5))
-       ORDER BY stock ASC`,
+      `${RESTOCK_QUERY} AND (product_stock.stock <= 0 OR product_stock.stock <= (product_stock.min_stock * 0.5))
+       ORDER BY product_stock.stock ASC`,
       [businessId]
     )
   ).rows;
@@ -87,6 +97,10 @@ export async function computeMonthlyStats(businessId, month) {
     { neto: 0, iva: 0, impuestoAdicional: 0 }
   );
 
+  const locationsCount = (
+    await pool.query('SELECT COUNT(*) AS count FROM locations WHERE business_id = $1', [businessId])
+  ).rows[0].count;
+
   const cash = (
     await pool.query(
       `SELECT
@@ -113,6 +127,7 @@ export async function computeMonthlyStats(businessId, month) {
     restockMovements: restocks.count,
     restockNeeded,
     criticalItems,
+    locationsCount: Number(locationsCount),
     taxes,
     refunds: { total: refunds.total, count: refunds.count },
     cash: {

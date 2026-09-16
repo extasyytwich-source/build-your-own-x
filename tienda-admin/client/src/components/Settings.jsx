@@ -16,6 +16,7 @@ import {
   IconSend,
   IconCheckCircle,
   IconQrCode,
+  IconStore,
 } from './icons.jsx';
 
 const SUBSCRIPTION_LABELS = {
@@ -68,6 +69,13 @@ export default function Settings() {
   const [telegramLink, setTelegramLink] = useState(null);
   const [telegramQr, setTelegramQr] = useState(null);
   const [disconnectingTelegram, setDisconnectingTelegram] = useState(false);
+
+  const [locations, setLocations] = useState([]);
+  const [newLocationName, setNewLocationName] = useState('');
+  const [creatingLocation, setCreatingLocation] = useState(false);
+  const [editingLocation, setEditingLocation] = useState(null);
+  const [editLocationName, setEditLocationName] = useState('');
+  const [deleteLocationTarget, setDeleteLocationTarget] = useState(null);
   const pollRef = useRef(null);
 
   const panelUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -80,6 +88,49 @@ export default function Settings() {
     return api.getTelegramStatus().then(setTelegramStatus).catch(() => {});
   }
 
+  function loadLocations() {
+    api.getLocations().then(setLocations).catch(() => {});
+  }
+
+  async function handleCreateLocation(e) {
+    e.preventDefault();
+    setCreatingLocation(true);
+    try {
+      await api.createLocation({ name: newLocationName });
+      notify('Sucursal agregada');
+      setNewLocationName('');
+      loadLocations();
+    } catch (err) {
+      notify(err.message, 'error');
+    } finally {
+      setCreatingLocation(false);
+    }
+  }
+
+  async function handleRenameLocation(e) {
+    e.preventDefault();
+    try {
+      await api.updateLocation(editingLocation.id, { name: editLocationName });
+      notify('Sucursal actualizada');
+      setEditingLocation(null);
+      loadLocations();
+    } catch (err) {
+      notify(err.message, 'error');
+    }
+  }
+
+  async function handleDeleteLocation() {
+    try {
+      await api.deleteLocation(deleteLocationTarget.id);
+      notify('Sucursal eliminada');
+      setDeleteLocationTarget(null);
+      loadLocations();
+    } catch (err) {
+      notify(err.message, 'error');
+      setDeleteLocationTarget(null);
+    }
+  }
+
   useEffect(() => {
     api.getAiSettings().then(setAiStatus).catch(() => {});
     api.getBillingStatus().then(setBilling).catch(() => {});
@@ -89,6 +140,7 @@ export default function Settings() {
     }).catch(() => {});
     loadEmployees();
     loadTelegramStatus();
+    loadLocations();
     return () => clearInterval(pollRef.current);
   }, []);
 
@@ -484,6 +536,75 @@ export default function Settings() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.085 }}
+        className="card mt-6 max-w-sm p-6"
+      >
+        <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+          <IconStore className="h-4 w-4" />
+          Sucursales
+        </h2>
+        <p className="mb-4 text-xs text-slate-500">
+          Cada sucursal lleva su propio stock. Caja y "Registrar movimiento" piden elegir en
+          cuál trabajar cuando hay más de una — con una sola, no hace falta elegir nada.
+        </p>
+
+        {locations.length > 0 && (
+          <ul className="mb-4 space-y-1.5">
+            {locations.map((loc) => (
+              <li
+                key={loc.id}
+                className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="font-medium text-slate-700">{loc.name}</span>
+                  {loc.isDefault && (
+                    <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-500">
+                      Principal
+                    </span>
+                  )}
+                </span>
+                <span className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingLocation(loc);
+                      setEditLocationName(loc.name);
+                    }}
+                    className="text-xs font-medium text-slate-400 hover:text-slate-700"
+                  >
+                    Renombrar
+                  </button>
+                  {!loc.isDefault && (
+                    <button
+                      onClick={() => setDeleteLocationTarget(loc)}
+                      className="text-slate-300 hover:text-rose-500"
+                      aria-label={`Quitar ${loc.name}`}
+                    >
+                      <IconX className="h-4 w-4" />
+                    </button>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <form onSubmit={handleCreateLocation} className="flex gap-2">
+          <input
+            required
+            className="input"
+            placeholder="Nombre de la nueva sucursal"
+            value={newLocationName}
+            onChange={(e) => setNewLocationName(e.target.value)}
+          />
+          <button type="submit" disabled={creatingLocation} className="btn-secondary shrink-0">
+            {creatingLocation ? 'Agregando…' : 'Agregar'}
+          </button>
+        </form>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.09 }}
         className="card mt-6 max-w-sm p-6"
       >
@@ -732,6 +853,33 @@ export default function Settings() {
         title="Cancelar suscripción"
         message="Se bloqueará el acceso al panel hasta que vuelvas a suscribirte. Tus datos no se borran."
         confirmLabel={cancelingSubscription ? 'Cancelando…' : 'Sí, cancelar'}
+      />
+
+      <Modal open={Boolean(editingLocation)} onClose={() => setEditingLocation(null)} title="Renombrar sucursal" width="max-w-sm">
+        <form onSubmit={handleRenameLocation} className="space-y-3">
+          <input
+            required
+            className="input"
+            value={editLocationName}
+            onChange={(e) => setEditLocationName(e.target.value)}
+          />
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setEditingLocation(null)} className="btn-secondary">
+              Cancelar
+            </button>
+            <button type="submit" className="btn-primary">
+              Guardar
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteLocationTarget)}
+        onClose={() => setDeleteLocationTarget(null)}
+        onConfirm={handleDeleteLocation}
+        title="Eliminar sucursal"
+        message={`¿Eliminar "${deleteLocationTarget?.name}"? Solo se puede si ya no tiene stock de ningún producto.`}
       />
     </div>
   );

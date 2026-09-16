@@ -58,7 +58,15 @@ async function insertBusiness(client, name) {
         'INSERT INTO businesses (name, store_code) VALUES ($1, $2) RETURNING id',
         [name.trim(), generateStoreCode()]
       );
-      return rows[0].id;
+      const businessId = rows[0].id;
+      // Todo negocio arranca con una sola sucursal — Caja/movimientos la
+      // usan sin preguntar nada mientras no se agregue otra (ver
+      // Multi-sucursal, migración 0016).
+      await client.query('INSERT INTO locations (business_id, name, is_default) VALUES ($1, $2, true)', [
+        businessId,
+        'Principal',
+      ]);
+      return businessId;
     } catch (err) {
       if (err.code === '23505' && attempt < 4) continue;
       throw err;

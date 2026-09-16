@@ -74,6 +74,12 @@ export const api = {
     request(`/products/${productId}/variants`, { method: 'POST', body: data }),
   printProductLabels: (ids, copies) =>
     openFile(`/products/labels.pdf?ids=${ids.join(',')}&copies=${copies}`),
+  getProductStock: (id) => request(`/products/${id}/stock`),
+
+  getLocations: () => request('/locations'),
+  createLocation: (data) => request('/locations', { method: 'POST', body: data }),
+  updateLocation: (id, data) => request(`/locations/${id}`, { method: 'PUT', body: data }),
+  deleteLocation: (id) => request(`/locations/${id}`, { method: 'DELETE' }),
 
   getMovements: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
