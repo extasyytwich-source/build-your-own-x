@@ -71,6 +71,10 @@ movementsRouter.get('/export.csv', async (req, res) => {
 // Exportada para que routes/sales.js y routes/purchaseOrders.js registren
 // cada línea del carrito/orden como el mismo movimiento de siempre,
 // etiquetado con el saleId o purchaseOrderId correspondiente.
+// unitPriceOverride: precio ya resuelto (con descuentos de Caja aplicados,
+// si los hay) que reemplaza el precio de catálogo del producto — así queda
+// congelado en el movimiento y los reportes de IVA/ganancia (que leen
+// unit_price de movements) reflejan el descuento sin ningún cambio.
 export async function registerMovement(
   client,
   businessId,
@@ -78,8 +82,7 @@ export async function registerMovement(
   type,
   quantity,
   note,
-  saleId = null,
-  purchaseOrderId = null
+  { saleId = null, purchaseOrderId = null, unitPriceOverride = null } = {}
 ) {
   const { rows: productRows } = await client.query(
     'SELECT * FROM products WHERE business_id = $1 AND id = $2 FOR UPDATE',
@@ -108,6 +111,8 @@ export async function registerMovement(
     productId,
   ]);
 
+  const unitPrice = unitPriceOverride !== null ? unitPriceOverride : product.price;
+
   const { rows } = await client.query(
     `INSERT INTO movements (business_id, product_id, type, quantity, stock_after, note, unit_price, unit_cost, sale_id, purchase_order_id)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -119,7 +124,7 @@ export async function registerMovement(
       quantity,
       newStock,
       note || null,
-      product.price,
+      unitPrice,
       product.cost,
       saleId,
       purchaseOrderId,

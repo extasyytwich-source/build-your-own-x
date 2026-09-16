@@ -34,7 +34,7 @@ export default function Caja() {
 
   const [search, setSearch] = useState('');
   const [results, setResults] = useState([]);
-  const [cart, setCart] = useState([]); // [{ product, quantity }]
+  const [cart, setCart] = useState([]); // [{ product, quantity, discountType, discountValue }]
   const [cameraOpen, setCameraOpen] = useState(false);
   const [ageConfirmProduct, setAgeConfirmProduct] = useState(null);
   const [payOpen, setPayOpen] = useState(false);
@@ -42,12 +42,34 @@ export default function Caja() {
   const [amountReceived, setAmountReceived] = useState('');
   const [charging, setCharging] = useState(false);
   const [lastSale, setLastSale] = useState(null); // { saleId, total, change }
+  const [discountEditorFor, setDiscountEditorFor] = useState(null); // productId con el editor de descuento abierto
+  const [totalDiscountOpen, setTotalDiscountOpen] = useState(false);
+  const [totalDiscountType, setTotalDiscountType] = useState('percent');
+  const [totalDiscountValue, setTotalDiscountValue] = useState('');
   const searchTimeout = useRef(null);
 
-  const total = useMemo(
-    () => cart.reduce((sum, line) => sum + line.product.price * line.quantity, 0),
+  // Descuento de una línea, ya resuelto a un monto en pesos (sin pasarse
+  // del subtotal de esa línea) — mismo cálculo que hace el backend, para
+  // que lo que se ve en pantalla sea justo lo que se va a cobrar.
+  function lineDiscountAmount(line) {
+    const base = line.product.price * line.quantity;
+    const value = Number(line.discountValue) || 0;
+    if (value <= 0) return 0;
+    const amount = line.discountType === 'percent' ? base * (value / 100) : value;
+    return Math.min(Math.max(amount, 0), base);
+  }
+
+  const subtotal = useMemo(
+    () => cart.reduce((sum, line) => sum + (line.product.price * line.quantity - lineDiscountAmount(line)), 0),
     [cart]
   );
+  const totalDiscountAmount = useMemo(() => {
+    const value = Number(totalDiscountValue) || 0;
+    if (value <= 0) return 0;
+    const amount = totalDiscountType === 'percent' ? subtotal * (value / 100) : value;
+    return Math.min(Math.max(amount, 0), subtotal);
+  }, [subtotal, totalDiscountType, totalDiscountValue]);
+  const total = subtotal - totalDiscountAmount;
 
   function insertToCart(product) {
     setCart((prev) => {
@@ -55,10 +77,14 @@ export default function Caja() {
       if (existing) {
         return prev.map((l) => (l.product.id === product.id ? { ...l, quantity: l.quantity + 1 } : l));
       }
-      return [...prev, { product, quantity: 1 }];
+      return [...prev, { product, quantity: 1, discountType: 'percent', discountValue: '' }];
     });
     setSearch('');
     setResults([]);
+  }
+
+  function updateLineDiscount(productId, field, value) {
+    setCart((prev) => prev.map((l) => (l.product.id === productId ? { ...l, [field]: value } : l)));
   }
 
   // Un producto de categoría alcohólica pide confirmar la edad la primera
@@ -128,14 +154,22 @@ export default function Caja() {
     setCharging(true);
     try {
       const result = await api.createSale({
-        items: cart.map((l) => ({ productId: l.product.id, quantity: l.quantity })),
+        items: cart.map((l) => ({
+          productId: l.product.id,
+          quantity: l.quantity,
+          discount: Number(l.discountValue) > 0 ? { type: l.discountType, value: Number(l.discountValue) } : undefined,
+        })),
         paymentMethod,
         amountReceived: paymentMethod === 'efectivo' ? amountReceivedNumber : undefined,
+        discount:
+          Number(totalDiscountValue) > 0 ? { type: totalDiscountType, value: Number(totalDiscountValue) } : undefined,
       });
       setLastSale(result);
       setCart([]);
       setPayOpen(false);
       setAmountReceived('');
+      setTotalDiscountValue('');
+      setTotalDiscountOpen(false);
     } catch (err) {
       if (err.status === 401) return handleUnauthorized();
       notify(err.message, 'error');
@@ -226,64 +260,139 @@ export default function Caja() {
         ) : (
           <div className="card divide-y divide-slate-100 p-0">
             <AnimatePresence initial={false}>
-              {cart.map((line) => (
-                <motion.div
-                  key={line.product.id}
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="flex items-center gap-3 px-4 py-3"
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
-                    {line.product.imageUrl ? (
-                      <img src={line.product.imageUrl} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <IconStore className="h-4 w-4 text-slate-300" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-700">{line.product.name}</p>
-                    <p className="text-xs text-slate-400">{currency(line.product.price)} c/u</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => updateQuantity(line.product.id, line.quantity - 1)}
-                      className="text-slate-400 hover:text-slate-700"
-                      aria-label="Restar"
-                    >
-                      <IconMinusCircle className="h-5 w-5" />
-                    </button>
-                    <span className="w-6 text-center text-sm font-medium">{line.quantity}</span>
-                    <button
-                      onClick={() => updateQuantity(line.product.id, line.quantity + 1)}
-                      className="text-slate-400 hover:text-slate-700"
-                      aria-label="Sumar"
-                    >
-                      <IconPlusCircle className="h-5 w-5" />
-                    </button>
-                  </div>
-                  <p className="w-20 shrink-0 text-right text-sm font-semibold text-slate-800">
-                    {currency(line.product.price * line.quantity)}
-                  </p>
-                  <button
-                    onClick={() => updateQuantity(line.product.id, 0)}
-                    className="shrink-0 text-slate-300 hover:text-rose-500"
-                    aria-label="Quitar"
+              {cart.map((line) => {
+                const discount = lineDiscountAmount(line);
+                const lineTotal = line.product.price * line.quantity - discount;
+                const editingDiscount = discountEditorFor === line.product.id;
+                return (
+                  <motion.div
+                    key={line.product.id}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="px-4 py-3"
                   >
-                    <IconX className="h-4 w-4" />
-                  </button>
-                </motion.div>
-              ))}
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                        {line.product.imageUrl ? (
+                          <img src={line.product.imageUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <IconStore className="h-4 w-4 text-slate-300" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-slate-700">{line.product.name}</p>
+                        <button
+                          onClick={() => setDiscountEditorFor(editingDiscount ? null : line.product.id)}
+                          className={`text-xs ${discount > 0 ? 'font-medium text-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                          {discount > 0 ? `Descuento: -${currency(discount)}` : '+ Descuento'}
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => updateQuantity(line.product.id, line.quantity - 1)}
+                          className="text-slate-400 hover:text-slate-700"
+                          aria-label="Restar"
+                        >
+                          <IconMinusCircle className="h-5 w-5" />
+                        </button>
+                        <span className="w-6 text-center text-sm font-medium">{line.quantity}</span>
+                        <button
+                          onClick={() => updateQuantity(line.product.id, line.quantity + 1)}
+                          className="text-slate-400 hover:text-slate-700"
+                          aria-label="Sumar"
+                        >
+                          <IconPlusCircle className="h-5 w-5" />
+                        </button>
+                      </div>
+                      <p className="w-20 shrink-0 text-right text-sm font-semibold text-slate-800">
+                        {currency(lineTotal)}
+                      </p>
+                      <button
+                        onClick={() => updateQuantity(line.product.id, 0)}
+                        className="shrink-0 text-slate-300 hover:text-rose-500"
+                        aria-label="Quitar"
+                      >
+                        <IconX className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    {editingDiscount && (
+                      <div className="mt-2 flex items-center gap-2 pl-12">
+                        <select
+                          className="input w-20 py-1 text-sm"
+                          value={line.discountType}
+                          onChange={(e) => updateLineDiscount(line.product.id, 'discountType', e.target.value)}
+                        >
+                          <option value="percent">%</option>
+                          <option value="fixed">$</option>
+                        </select>
+                        <input
+                          type="number"
+                          min="0"
+                          className="input w-24 py-1 text-sm"
+                          placeholder="0"
+                          value={line.discountValue}
+                          onChange={(e) => updateLineDiscount(line.product.id, 'discountValue', e.target.value)}
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => setDiscountEditorFor(null)}
+                          className="text-xs font-medium text-slate-500 hover:text-slate-800"
+                        >
+                          Listo
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
           </div>
         )}
 
         {cart.length > 0 && (
-          <div className="mt-6 flex items-center justify-between">
-            <p className="text-lg font-semibold text-slate-800">Total: {currency(total)}</p>
-            <button onClick={() => setPayOpen(true)} className="btn-primary px-6 py-3">
-              Cobrar
-            </button>
+          <div className="mt-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setTotalDiscountOpen((open) => !open)}
+                className={`text-sm ${
+                  totalDiscountAmount > 0 ? 'font-medium text-emerald-600' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {totalDiscountAmount > 0 ? `Descuento total: -${currency(totalDiscountAmount)}` : '+ Descuento al total'}
+              </button>
+            </div>
+            {totalDiscountOpen && (
+              <div className="flex items-center gap-2">
+                <select
+                  className="input w-20 py-1 text-sm"
+                  value={totalDiscountType}
+                  onChange={(e) => setTotalDiscountType(e.target.value)}
+                >
+                  <option value="percent">%</option>
+                  <option value="fixed">$</option>
+                </select>
+                <input
+                  type="number"
+                  min="0"
+                  className="input w-24 py-1 text-sm"
+                  placeholder="0"
+                  value={totalDiscountValue}
+                  onChange={(e) => setTotalDiscountValue(e.target.value)}
+                />
+              </div>
+            )}
+            {totalDiscountAmount > 0 && (
+              <p className="text-sm text-slate-400">Subtotal: {currency(subtotal)}</p>
+            )}
+            <div className="flex items-center justify-between">
+              <p className="text-lg font-semibold text-slate-800">Total: {currency(total)}</p>
+              <button onClick={() => setPayOpen(true)} className="btn-primary px-6 py-3">
+                Cobrar
+              </button>
+            </div>
           </div>
         )}
       </main>

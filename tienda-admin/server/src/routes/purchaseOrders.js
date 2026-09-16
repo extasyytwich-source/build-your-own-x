@@ -168,8 +168,7 @@ purchaseOrdersRouter.post('/:id/receive', async (req, res) => {
         'entrada',
         Number(item.quantity),
         `Orden de compra #${order.id}`,
-        null,
-        order.id
+        { purchaseOrderId: order.id }
       );
     }
 
