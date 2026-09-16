@@ -28,7 +28,10 @@ información de otra tienda. El acceso requiere una suscripción mensual de
   alcohólica, para recordar pedir identificación.
 - **Empleados**: el dueño da de alta cuentas de cajero (usuario + contraseña,
   sin necesitar un correo) desde Ajustes. Un cajero entra directo a Caja, sin
-  ver productos, historial, reportes ni ajustes.
+  ver productos, historial, reportes ni ajustes. Al entrar, se elige primero
+  "Soy el dueño" o "Soy empleado"; el empleado puede escribir su usuario y
+  contraseña o escanear el código QR que le generó el dueño en Ajustes, sin
+  escribir nada.
 - **Impuestos**: además del IVA (19%), cada producto puede marcarse con el
   impuesto adicional que la ley chilena cobra sobre bebidas alcohólicas
   (según grado) o azucaradas — los reportes mensuales muestran el desglose

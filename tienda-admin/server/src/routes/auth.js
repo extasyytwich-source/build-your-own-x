@@ -11,6 +11,7 @@ import {
   clearSessionCookie,
   verifyGoogleIdToken,
   findOrCreateGoogleUser,
+  verifyQrToken,
 } from '../auth.js';
 
 export const authRouter = Router();
@@ -55,6 +56,26 @@ authRouter.post('/login', async (req, res) => {
 
   const token = issueToken({ userId: result.userId, businessId: result.businessId, role: result.role });
   setSessionCookie(res, token);
+  res.json({ subscriptionStatus: result.subscriptionStatus, role: result.role, name: result.name });
+});
+
+// Login de un empleado por el código QR que le generó el dueño (ver
+// routes/employees.js) — evita escribir usuario/contraseña en el
+// dispositivo compartido de la caja. Va bajo el mismo authLimiter que
+// /login, para frenar intentos de adivinar un token a fuerza bruta.
+authRouter.post('/qr-login', async (req, res) => {
+  const { token } = req.body ?? {};
+  if (!token) {
+    return res.status(400).json({ error: 'Falta el código' });
+  }
+
+  const result = await verifyQrToken(token);
+  if (!result) {
+    return res.status(401).json({ error: 'Código no válido. Pide al dueño que genere uno nuevo.' });
+  }
+
+  const jwtToken = issueToken({ userId: result.userId, businessId: result.businessId, role: result.role });
+  setSessionCookie(res, jwtToken);
   res.json({ subscriptionStatus: result.subscriptionStatus, role: result.role, name: result.name });
 });
 

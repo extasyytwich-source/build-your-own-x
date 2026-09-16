@@ -285,6 +285,17 @@ export function IconArrowRight(props) {
   );
 }
 
+export function IconQrCode(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20v.01" />
+    </svg>
+  );
+}
+
 export function IconRefreshCw(props) {
   return (
     <svg viewBox="0 0 24 24" {...base} {...props}>

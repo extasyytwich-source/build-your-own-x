@@ -5,6 +5,7 @@ import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
+import Modal from './Modal.jsx';
 import {
   IconDownload,
   IconUpload,
@@ -14,6 +15,7 @@ import {
   IconX,
   IconSend,
   IconCheckCircle,
+  IconQrCode,
 } from './icons.jsx';
 
 const SUBSCRIPTION_LABELS = {
@@ -56,6 +58,9 @@ export default function Settings() {
   const [creatingEmployee, setCreatingEmployee] = useState(false);
   const [deleteEmployeeTarget, setDeleteEmployeeTarget] = useState(null);
   const [removingEmployee, setRemovingEmployee] = useState(false);
+  const [qrEmployee, setQrEmployee] = useState(null);
+  const [qrImage, setQrImage] = useState(null);
+  const [generatingQr, setGeneratingQr] = useState(false);
 
   const [telegramStatus, setTelegramStatus] = useState(null);
   const [telegramConnecting, setTelegramConnecting] = useState(false);
@@ -159,6 +164,23 @@ export default function Settings() {
     } finally {
       setRemovingEmployee(false);
       setDeleteEmployeeTarget(null);
+    }
+  }
+
+  // Genera (o regenera, invalidando el anterior) el código QR de acceso
+  // rápido del empleado: quien lo escanee entra directo como él, sin
+  // usuario ni contraseña — ver LoginGate.jsx del lado de quien entra.
+  async function handleShowQr(emp) {
+    setQrEmployee(emp);
+    setGeneratingQr(true);
+    try {
+      const { token } = await api.generateEmployeeQr(emp.id);
+      setQrImage(await QRCode.toDataURL(token, { margin: 1, width: 220 }));
+    } catch (err) {
+      notify(err.message, 'error');
+      setQrEmployee(null);
+    } finally {
+      setGeneratingQr(false);
     }
   }
 
@@ -377,8 +399,9 @@ export default function Settings() {
           Empleados
         </h2>
         <p className="mb-4 text-xs text-slate-500">
-          Cada empleado entra con su propio usuario y contraseña, directo a la pantalla de Caja —
-          no ve productos, historial, reportes ni ajustes.
+          Cada empleado entra con su propio usuario y contraseña, o escaneando su código QR
+          (ícono junto a su nombre), directo a la pantalla de Caja — no ve productos, historial,
+          reportes ni ajustes.
         </p>
 
         {employees.length > 0 && (
@@ -392,13 +415,22 @@ export default function Settings() {
                   <span className="font-medium text-slate-700">{emp.name}</span>
                   <span className="ml-2 text-xs text-slate-400">@{emp.username}</span>
                 </span>
-                <button
-                  onClick={() => setDeleteEmployeeTarget(emp)}
-                  className="text-slate-300 hover:text-rose-500"
-                  aria-label={`Quitar a ${emp.name}`}
-                >
-                  <IconX className="h-4 w-4" />
-                </button>
+                <span className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleShowQr(emp)}
+                    className="text-slate-300 hover:text-slate-600"
+                    aria-label={`Código QR de ${emp.name}`}
+                  >
+                    <IconQrCode className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setDeleteEmployeeTarget(emp)}
+                    className="text-slate-300 hover:text-rose-500"
+                    aria-label={`Quitar a ${emp.name}`}
+                  >
+                    <IconX className="h-4 w-4" />
+                  </button>
+                </span>
               </li>
             ))}
           </ul>
@@ -629,6 +661,45 @@ export default function Settings() {
         message={`Esto reemplazará todos los productos, movimientos y registros de caja actuales por los del archivo "${restoreFile?.name}". Esta acción no se puede deshacer. ¿Continuar?`}
         confirmLabel={restoring ? 'Restaurando…' : 'Restaurar'}
       />
+
+      <Modal
+        open={Boolean(qrEmployee)}
+        onClose={() => setQrEmployee(null)}
+        title={`Código de acceso — ${qrEmployee?.name ?? ''}`}
+        width="max-w-xs"
+      >
+        <div className="flex flex-col items-center gap-4 text-center">
+          {generatingQr ? (
+            <div className="flex h-56 w-56 items-center justify-center text-sm text-slate-400">
+              Generando…
+            </div>
+          ) : (
+            qrImage && (
+              <img
+                src={qrImage}
+                alt={`Código QR de acceso de ${qrEmployee?.name}`}
+                className="h-56 w-56 rounded-xl border border-slate-200 p-2"
+              />
+            )
+          )}
+          <p className="text-xs text-slate-500">
+            Este código entra directo como <strong>{qrEmployee?.name}</strong>, sin pedir usuario
+            ni contraseña. Muéstralo en pantalla o imprímelo cerca de la caja — trátalo como una
+            contraseña.
+          </p>
+          <p className="text-xs text-slate-400">
+            Si se pierde o quieres que deje de funcionar, genera uno nuevo: el anterior queda
+            invalidado al instante.
+          </p>
+          <button
+            onClick={() => handleShowQr(qrEmployee)}
+            disabled={generatingQr}
+            className="btn-secondary w-full"
+          >
+            {generatingQr ? 'Generando…' : 'Regenerar código'}
+          </button>
+        </div>
+      </Modal>
 
       <ConfirmDialog
         open={Boolean(deleteEmployeeTarget)}

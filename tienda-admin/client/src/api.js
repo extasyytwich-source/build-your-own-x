@@ -47,6 +47,7 @@ export const api = {
   signup: (businessName, email, password) =>
     request('/auth/signup', { method: 'POST', body: { businessName, email, password } }),
   login: (identifier, password) => request('/auth/login', { method: 'POST', body: { identifier, password } }),
+  loginWithQr: (token) => request('/auth/qr-login', { method: 'POST', body: { token } }),
   loginWithGoogle: (credential, businessName) =>
     request('/auth/google', { method: 'POST', body: { credential, businessName } }),
   logout: () => request('/auth/logout', { method: 'POST' }),
@@ -96,6 +97,7 @@ export const api = {
   getEmployees: () => request('/employees'),
   createEmployee: (data) => request('/employees', { method: 'POST', body: data }),
   deleteEmployee: (id) => request(`/employees/${id}`, { method: 'DELETE' }),
+  generateEmployeeQr: (id) => request(`/employees/${id}/qr`, { method: 'POST' }),
 
   getTelegramStatus: () => request('/telegram'),
   connectTelegram: () => request('/telegram/connect', { method: 'POST' }),
