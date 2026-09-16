@@ -134,6 +134,50 @@ export async function createEmployee(businessId, { name, username, password }) {
   }
 }
 
+// Código QR de acceso rápido de un empleado (ver routes/employees.js): un
+// token de alta entropía que hace de "credencial física" — quien lo tenga
+// entra directo como ese empleado, sin usuario ni contraseña. Se guarda solo
+// su hash (SHA-256 alcanza: a diferencia de una contraseña, no hay que
+// defenderlo de un diccionario, ya es aleatorio de 24 bytes) para poder
+// buscarlo por igualdad exacta.
+function hashQrToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+export async function generateEmployeeQrToken(businessId, employeeId) {
+  const token = crypto.randomBytes(24).toString('hex');
+  const { rowCount } = await pool.query(
+    `UPDATE users SET qr_token_hash = $1 WHERE id = $2 AND business_id = $3 AND role = 'cajero'`,
+    [hashQrToken(token), employeeId, businessId]
+  );
+  if (!rowCount) {
+    const err = new Error('Empleado no encontrado');
+    err.status = 404;
+    throw err;
+  }
+  return token;
+}
+
+export async function verifyQrToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  const { rows } = await pool.query(
+    `SELECT users.id AS user_id, users.business_id, users.role, users.name,
+            businesses.subscription_status, businesses.subscription_exempt
+     FROM users JOIN businesses ON businesses.id = users.business_id
+     WHERE users.qr_token_hash = $1`,
+    [hashQrToken(token)]
+  );
+  const user = rows[0];
+  if (!user) return null;
+  return {
+    userId: user.user_id,
+    businessId: user.business_id,
+    role: user.role,
+    name: user.name,
+    subscriptionStatus: effectiveSubscriptionStatus(user),
+  };
+}
+
 export async function hasPassword(userId) {
   const { rows } = await pool.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
   return Boolean(rows[0]?.password_hash);

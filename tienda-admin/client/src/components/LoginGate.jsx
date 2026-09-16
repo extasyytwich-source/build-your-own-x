@@ -1,16 +1,23 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useShake } from '../hooks/useShake.js';
-import { IconLock } from './icons.jsx';
+import { IconLock, IconStore, IconUsers, IconCamera } from './icons.jsx';
 import GoogleSignInButton from './GoogleSignInButton.jsx';
 
+const CameraScannerModal = lazy(() => import('./CameraScannerModal.jsx'));
+const CAMERA_SUPPORTED = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
+
 export default function LoginGate({ initialMode = 'login', onBack }) {
-  const { login, signup, loginWithGoogle } = useAuth();
+  const { login, signup, loginWithGoogle, loginWithQr } = useAuth();
   const [mode, setMode] = useState(initialMode); // 'login' | 'signup'
+  // Solo el login se separa por quién entra — crear cuenta es siempre del
+  // dueño (un negocio nuevo), así que arranca directo en 'owner'.
+  const [audience, setAudience] = useState(initialMode === 'signup' ? 'owner' : null); // null | 'owner' | 'employee'
+  const [employeeStep, setEmployeeStep] = useState('choice'); // 'choice' | 'scan' | 'manual'
   const [businessName, setBusinessName] = useState('');
-  // En registro es siempre un correo (el dueño); en login puede ser el
-  // correo del dueño o el usuario de un empleado (ver auth.js del server).
+  // En registro es siempre un correo (el dueño); en login del dueño también;
+  // en login de empleado es su usuario (ver auth.js del server).
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -30,6 +37,20 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
     try {
       if (mode === 'signup') await signup(businessName, identifier, password);
       else await login(identifier, password);
+    } catch (err) {
+      setError(err.message);
+      shake();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleQrDetected(token) {
+    setEmployeeStep('choice');
+    setError('');
+    setLoading(true);
+    try {
+      await loginWithQr(token);
     } catch (err) {
       setError(err.message);
       shake();
@@ -71,6 +92,230 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
   function switchMode(nextMode) {
     setMode(nextMode);
     setError('');
+  }
+
+  // Si se llegó directo a "Crear cuenta" desde la landing, nunca se mostró
+  // el selector de dueño/empleado — Volver debe salir a la landing. Si en
+  // cambio se llegó eligiendo "Soy el dueño" (o su enlace de "Crear
+  // cuenta"), Volver regresa al selector.
+  function handleOwnerBack() {
+    if (initialMode === 'signup') {
+      onBack?.();
+    } else {
+      setAudience(null);
+      setMode('login');
+      setError('');
+    }
+  }
+
+  if (mode === 'login' && audience === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-800 via-zinc-950 to-black px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 24, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          className="w-full max-w-sm rounded-2xl bg-white/95 p-8 shadow-2xl backdrop-blur"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.15, type: 'spring', stiffness: 200 }}
+            className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500 text-white shadow-soft"
+          >
+            <IconLock className="h-6 w-6" />
+          </motion.div>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="mb-3 text-xs font-medium text-slate-400 hover:text-slate-600"
+            >
+              ← Volver
+            </button>
+          )}
+          <h1 className="mb-1 text-center text-xl font-semibold text-slate-800">Mostrador</h1>
+          <p className="mb-6 text-center text-xs text-slate-500">¿Quién va a entrar?</p>
+
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setAudience('owner')}
+              className="flex w-full items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+                <IconStore className="h-5 w-5" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-slate-800">Soy el dueño</span>
+                <span className="block text-xs text-slate-400">Panel completo del negocio</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAudience('employee')}
+              className="flex w-full items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+                <IconUsers className="h-5 w-5" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-slate-800">Soy empleado</span>
+                <span className="block text-xs text-slate-400">Solo cobrar en Caja</span>
+              </span>
+            </button>
+          </div>
+
+          <p className="mt-5 text-center text-xs text-slate-400">
+            ¿Vas a crear una cuenta nueva de negocio?{' '}
+            <button
+              type="button"
+              onClick={() => {
+                setAudience('owner');
+                setMode('signup');
+              }}
+              className="font-medium text-slate-600 underline"
+            >
+              Crear cuenta
+            </button>
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (audience === 'employee') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-800 via-zinc-950 to-black px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 24, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          className="w-full max-w-sm rounded-2xl bg-white/95 p-8 shadow-2xl backdrop-blur"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.15, type: 'spring', stiffness: 200 }}
+            className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500 text-white shadow-soft"
+          >
+            <IconUsers className="h-6 w-6" />
+          </motion.div>
+          <button
+            type="button"
+            onClick={() => {
+              setAudience(null);
+              setEmployeeStep('choice');
+              setError('');
+            }}
+            className="mb-3 text-xs font-medium text-slate-400 hover:text-slate-600"
+          >
+            ← Volver
+          </button>
+          <h1 className="mb-1 text-center text-xl font-semibold text-slate-800">Empleado</h1>
+          <p className="mb-6 text-center text-xs text-slate-500">
+            {employeeStep === 'manual' ? 'Ingresa tu usuario y contraseña' : 'Escanea tu código o entra manualmente'}
+          </p>
+
+          {employeeStep === 'choice' && (
+            <div className="space-y-3">
+              {CAMERA_SUPPORTED && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError('');
+                    setEmployeeStep('scan');
+                  }}
+                  className="btn-primary flex w-full items-center justify-center gap-2"
+                >
+                  <IconCamera className="h-4 w-4" />
+                  Escanear código
+                </button>
+              )}
+              <button type="button" onClick={() => setEmployeeStep('manual')} className="btn-secondary w-full">
+                Ingresar usuario y contraseña
+              </button>
+            </div>
+          )}
+
+          {employeeStep === 'manual' && (
+            <form onSubmit={handleSubmit}>
+              <motion.div animate={shakeControls} className="space-y-3">
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="Usuario"
+                  className="input"
+                />
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Contraseña"
+                  className="input"
+                />
+              </motion.div>
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="mt-3 text-center text-sm text-rose-600"
+                >
+                  {error}
+                </motion.p>
+              )}
+              <button type="submit" disabled={loading} className="btn-primary mt-4 w-full">
+                {loading ? 'Un momento…' : 'Entrar'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmployeeStep('choice');
+                  setError('');
+                }}
+                className="mt-3 w-full text-center text-xs text-slate-400 hover:text-slate-600"
+              >
+                ← Volver
+              </button>
+            </form>
+          )}
+
+          {employeeStep === 'scan' && (
+            <>
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="mb-3 text-center text-sm text-rose-600"
+                >
+                  {error}
+                </motion.p>
+              )}
+              <button
+                type="button"
+                onClick={() => setEmployeeStep('choice')}
+                className="w-full text-center text-xs text-slate-400 hover:text-slate-600"
+              >
+                Cancelar
+              </button>
+            </>
+          )}
+        </motion.div>
+
+        <Suspense fallback={null}>
+          <CameraScannerModal
+            open={employeeStep === 'scan'}
+            onClose={() => setEmployeeStep('choice')}
+            onDetected={handleQrDetected}
+          />
+        </Suspense>
+      </div>
+    );
   }
 
   if (pendingGoogleCredential) {
@@ -139,15 +384,13 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
         >
           <IconLock className="h-6 w-6" />
         </motion.div>
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            className="mb-3 text-xs font-medium text-slate-400 hover:text-slate-600"
-          >
-            ← Volver
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleOwnerBack}
+          className="mb-3 text-xs font-medium text-slate-400 hover:text-slate-600"
+        >
+          ← Volver
+        </button>
         <h1 className="mb-1 text-center text-xl font-semibold text-slate-800">Mostrador</h1>
         <p className="mb-6 text-center text-xs text-slate-500">
           {mode === 'login' ? 'Ingresa a tu panel' : 'Crea la cuenta de tu negocio'}
@@ -196,11 +439,11 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
             />
           )}
           <input
-            type={mode === 'signup' ? 'email' : 'text'}
+            type="email"
             required
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
-            placeholder={mode === 'signup' ? 'Correo electrónico' : 'Correo o usuario'}
+            placeholder="Correo electrónico"
             className="input"
           />
           <input

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
-import { createEmployee } from '../auth.js';
+import { createEmployee, generateEmployeeQrToken } from '../auth.js';
 
 export const employeesRouter = Router();
 
@@ -37,6 +37,17 @@ employeesRouter.post('/', async (req, res) => {
       username: employee.username,
       createdAt: employee.created_at,
     });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || 'Error interno' });
+  }
+});
+
+// Genera (o regenera, invalidando el anterior) el código QR de acceso
+// rápido de un empleado — ver auth.js: generateEmployeeQrToken.
+employeesRouter.post('/:id/qr', async (req, res) => {
+  try {
+    const token = await generateEmployeeQrToken(req.businessId, req.params.id);
+    res.json({ token });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message || 'Error interno' });
   }

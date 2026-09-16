@@ -56,6 +56,15 @@ export function AuthProvider({ children }) {
         setName(result.name ?? null);
         setSubscriptionStatus(result.subscriptionStatus);
       },
+      // Login de un empleado por el código QR que le generó el dueño, sin
+      // escribir usuario ni contraseña (ver LoginGate.jsx).
+      async loginWithQr(token) {
+        const result = await api.loginWithQr(token);
+        setIsAuthenticated(true);
+        setRole(result.role);
+        setName(result.name ?? null);
+        setSubscriptionStatus(result.subscriptionStatus);
+      },
       // Devuelve needsBusinessName cuando es una cuenta de Google nueva y
       // todavía no sabemos el nombre del negocio (ver LoginGate.jsx).
       async loginWithGoogle(credential, businessName) {
