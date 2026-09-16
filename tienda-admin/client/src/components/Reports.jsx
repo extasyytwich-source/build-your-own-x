@@ -144,7 +144,7 @@ export default function Reports() {
         <LoadingSpinner label="Cargando reporte…" />
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <StatCard
               icon={<IconCoins className="h-5 w-5" />}
               label="Ganancias del mes"
@@ -167,6 +167,14 @@ export default function Reports() {
               formatter={currency}
               accent="amber"
               delay={0.1}
+            />
+            <StatCard
+              icon={<IconMinusCircle className="h-5 w-5" />}
+              label={`Devoluciones${report.refunds?.count ? ` (${report.refunds.count})` : ''}`}
+              value={report.refunds?.total || 0}
+              formatter={currency}
+              accent="rose"
+              delay={0.13}
             />
             <StatCard
               icon={

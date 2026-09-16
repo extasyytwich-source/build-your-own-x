@@ -19,6 +19,7 @@ import { reportsRouter } from './routes/reports.js';
 import { settingsRouter } from './routes/settings.js';
 import { employeesRouter } from './routes/employees.js';
 import { salesRouter } from './routes/sales.js';
+import { refundsRouter } from './routes/refunds.js';
 import { suppliersRouter } from './routes/suppliers.js';
 import { purchaseOrdersRouter } from './routes/purchaseOrders.js';
 import { telegramRouter } from './routes/telegram.js';
@@ -111,6 +112,8 @@ export function createApp() {
   app.use('/api/purchase-orders', requireAuth, requireActiveSubscription, requireOwner, purchaseOrdersRouter);
   // Cobrar es lo único que necesita el cajero: compartido entre owner y cajero.
   app.use('/api/sales', requireAuth, requireActiveSubscription, salesRouter);
+  // Las devoluciones las autoriza el dueño, no el cajero.
+  app.use('/api/refunds', requireAuth, requireActiveSubscription, requireOwner, refundsRouter);
   // El webhook (público, lo llama Telegram) va montado antes que las rutas
   // de dueño con el mismo prefijo, para que no le apliquen requireAuth.
   app.use('/api/telegram/webhook', telegramWebhookRouter);
