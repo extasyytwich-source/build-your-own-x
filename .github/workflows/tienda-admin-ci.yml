@@ -1,0 +1,68 @@
+name: Mostrador — pruebas y build
+
+on:
+  workflow_dispatch: {}
+  push:
+    paths:
+      - 'tienda-admin/server/**'
+      - 'tienda-admin/client/**'
+      - '.github/workflows/tienda-admin-ci.yml'
+  pull_request:
+    paths:
+      - 'tienda-admin/server/**'
+      - 'tienda-admin/client/**'
+      - '.github/workflows/tienda-admin-ci.yml'
+
+jobs:
+  server-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: mostrador
+          POSTGRES_PASSWORD: mostrador
+          POSTGRES_DB: mostrador_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias del servidor
+        working-directory: tienda-admin/server
+        run: npm install
+
+      - name: Correr la suite de pruebas (unitarias + integración contra Postgres)
+        working-directory: tienda-admin/server
+        env:
+          DATABASE_URL: postgresql://mostrador:mostrador@localhost:5432/mostrador_ci
+          JWT_SECRET: ci-secret-no-es-para-produccion
+          NODE_ENV: development
+        run: npm test
+
+  client-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias del cliente
+        working-directory: tienda-admin/client
+        run: npm install
+
+      - name: Compilar el panel (detecta errores de build)
+        working-directory: tienda-admin/client
+        run: npm run build
