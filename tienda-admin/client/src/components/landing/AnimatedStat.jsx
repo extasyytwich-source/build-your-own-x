@@ -6,7 +6,7 @@ import { useCountUp } from '../StatCard.jsx';
 // pasa 0 a useCountUp hasta ese momento, y recién ahí el valor real, para que
 // reaproveche la misma lógica de easing que ya usa StatCard sin arrancar antes
 // de que el usuario llegue a esta sección.
-export default function AnimatedStat({ icon, value, label, formatter, delay = 0 }) {
+export default function AnimatedStat({ icon, value, label, formatter, delay = 0, accent = '#7F77DD' }) {
   const [started, setStarted] = useState(false);
   const animated = useCountUp(started ? value : 0);
   const formatted = formatter ? formatter(animated) : Math.round(animated).toLocaleString('es-CL');
@@ -19,13 +19,16 @@ export default function AnimatedStat({ icon, value, label, formatter, delay = 0 
       onViewportEnter={() => setStarted(true)}
       transition={{ duration: 0.4, delay }}
       whileHover={{ y: -3, transition: { duration: 0.2 } }}
-      className="card p-6 text-center"
+      className="rounded-2xl border border-night-border bg-night-card p-6 text-center"
     >
-      <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-black text-white">
+      <div
+        className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl"
+        style={{ backgroundColor: `${accent}26`, color: accent }}
+      >
         {icon}
       </div>
-      <p className="text-3xl font-semibold text-slate-900">{formatted}</p>
-      <p className="mt-1 text-sm text-slate-500">{label}</p>
+      <p className="font-display text-3xl font-semibold text-white">{formatted}</p>
+      <p className="mt-1 text-sm text-white/60">{label}</p>
     </motion.div>
   );
 }

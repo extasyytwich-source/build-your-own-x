@@ -6,7 +6,7 @@ export default function Faq({ items }) {
   const [openIndex, setOpenIndex] = useState(null);
 
   return (
-    <div className="mx-auto max-w-2xl divide-y divide-slate-100">
+    <div className="mx-auto max-w-2xl divide-y divide-night-border">
       {items.map((item, i) => {
         const isOpen = openIndex === i;
         const panelId = `faq-panel-${i}`;
@@ -19,11 +19,11 @@ export default function Faq({ items }) {
               aria-controls={panelId}
               className="flex w-full items-center justify-between gap-4 py-5 text-left"
             >
-              <span className="text-sm font-medium text-slate-800">{item.question}</span>
+              <span className="text-sm font-medium text-white">{item.question}</span>
               <motion.span
                 animate={{ rotate: isOpen ? 180 : 0 }}
                 transition={{ duration: 0.2 }}
-                className="shrink-0 text-slate-400"
+                className="shrink-0 text-white/40"
               >
                 <IconChevronDown className="h-4 w-4" />
               </motion.span>
@@ -39,7 +39,7 @@ export default function Faq({ items }) {
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
-                  <p className="pb-5 text-sm text-slate-500">{item.answer}</p>
+                  <p className="pb-5 text-sm text-white/60">{item.answer}</p>
                 </motion.div>
               )}
             </AnimatePresence>

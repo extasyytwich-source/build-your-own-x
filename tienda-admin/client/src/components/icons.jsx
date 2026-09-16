@@ -315,3 +315,11 @@ export function IconTruck(props) {
     </svg>
   );
 }
+
+export function IconMenu(props) {
+  return (
+    <svg viewBox="0 0 24 24" {...base} {...props}>
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
