@@ -34,7 +34,10 @@ información de otra tienda. El acceso requiere una suscripción mensual de
   escribir nada. El usuario de un empleado solo tiene que ser único dentro
   de su propia tienda (no en toda la plataforma): el login manual pide
   también el "código de tienda" que el dueño ve en Ajustes, así dos negocios
-  sin relación pueden tener cada uno, por ejemplo, un empleado "juan".
+  sin relación pueden tener cada uno, por ejemplo, un empleado "juan". Al
+  registrar un negocio nuevo y activar la suscripción, no se entra directo
+  al panel: se vuelve al selector "soy dueño o empleado", y se entra con las
+  credenciales recién creadas, como cualquier otro inicio de sesión.
 - **Impuestos**: además del IVA (19%), cada producto puede marcarse con el
   impuesto adicional que la ley chilena cobra sobre bebidas alcohólicas
   (según grado) o azucaradas — los reportes mensuales muestran el desglose

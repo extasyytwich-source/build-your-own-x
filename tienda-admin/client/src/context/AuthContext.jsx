@@ -10,12 +10,19 @@ export function AuthProvider({ children }) {
   const [name, setName] = useState(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const [checkingSubscription, setCheckingSubscription] = useState(true);
+  // true justo después de registrar un negocio nuevo (hasta que cierre
+  // sesión otra vez, ver App.jsx): al terminar de pagar, en vez de entrar
+  // directo, se vuelve al selector "soy dueño o empleado" — quien se
+  // registró entra ahí como cualquier otro, con las credenciales que
+  // acaba de crear.
+  const [justCompletedSignup, setJustCompletedSignup] = useState(false);
 
   function clearSession() {
     setIsAuthenticated(false);
     setRole(null);
     setName(null);
     setSubscriptionStatus(null);
+    setJustCompletedSignup(false);
   }
 
   // La sesión vive en una cookie httpOnly: este cliente no puede leerla, así
@@ -42,12 +49,14 @@ export function AuthProvider({ children }) {
       name,
       subscriptionStatus,
       checkingSubscription,
+      justCompletedSignup,
       async signup(businessName, email, password) {
         const result = await api.signup(businessName, email, password);
         setIsAuthenticated(true);
         setRole(result.role);
         setName(null);
         setSubscriptionStatus(result.subscriptionStatus);
+        setJustCompletedSignup(true);
       },
       async login(identifier, password) {
         const result = await api.login(identifier, password);
@@ -85,6 +94,10 @@ export function AuthProvider({ children }) {
         setRole(result.role);
         setName(null);
         setSubscriptionStatus(result.subscriptionStatus);
+        // Un businessName acá solo llega al completar el registro de un
+        // negocio nuevo con Google (ver handleCompleteGoogleSignup en
+        // LoginGate.jsx) — un login de Google normal nunca lo manda.
+        if (businessName) setJustCompletedSignup(true);
         return result;
       },
       async refreshSubscriptionStatus() {
@@ -104,7 +117,7 @@ export function AuthProvider({ children }) {
         clearSession();
       },
     }),
-    [isAuthenticated, role, name, subscriptionStatus, checkingSubscription]
+    [isAuthenticated, role, name, subscriptionStatus, checkingSubscription, justCompletedSignup]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
