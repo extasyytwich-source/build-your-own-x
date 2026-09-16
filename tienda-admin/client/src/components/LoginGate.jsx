@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext.jsx';
+import { api } from '../api.js';
 import { useShake } from '../hooks/useShake.js';
 import { IconLock, IconStore, IconUsers, IconCamera } from './icons.jsx';
 import GoogleSignInButton from './GoogleSignInButton.jsx';
@@ -14,15 +15,19 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
   // Solo el login se separa por quién entra — crear cuenta es siempre del
   // dueño (un negocio nuevo), así que arranca directo en 'owner'.
   const [audience, setAudience] = useState(initialMode === 'signup' ? 'owner' : null); // null | 'owner' | 'employee'
+  // Al iniciar sesión (no al crear cuenta), primero se identifica la tienda
+  // por su nombre — recién con eso resuelto aparece el selector de rol. El
+  // código de tienda que devuelve (ver auth.js del server) se usa después
+  // para el login manual de un empleado, sin que tenga que volver a
+  // escribirlo.
+  const [businessQuery, setBusinessQuery] = useState('');
+  const [resolvedBusiness, setResolvedBusiness] = useState(null); // { name, storeCode } | null
+  const [lookingUpBusiness, setLookingUpBusiness] = useState(false);
   const [employeeStep, setEmployeeStep] = useState('choice'); // 'choice' | 'scan' | 'manual'
   const [businessName, setBusinessName] = useState('');
   // En registro es siempre un correo (el dueño); en login del dueño también.
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  // El usuario de un empleado solo es único dentro de su propia tienda (ver
-  // auth.js del server), así que su login manual pide también este código
-  // (el dueño lo ve en Ajustes para compartirlo).
-  const [storeCode, setStoreCode] = useState('');
   const [employeeUsername, setEmployeeUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,12 +59,27 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
     setError('');
     setLoading(true);
     try {
-      await loginEmployee(storeCode, employeeUsername, password);
+      await loginEmployee(resolvedBusiness.storeCode, employeeUsername, password);
     } catch (err) {
       setError(err.message);
       shake();
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleBusinessLookup(e) {
+    e.preventDefault();
+    setError('');
+    setLookingUpBusiness(true);
+    try {
+      const result = await api.lookupBusiness(businessQuery);
+      setResolvedBusiness(result);
+    } catch (err) {
+      setError(err.message);
+      shake();
+    } finally {
+      setLookingUpBusiness(false);
     }
   }
 
@@ -126,6 +146,66 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
     }
   }
 
+  if (initialMode === 'login' && audience === null && !resolvedBusiness) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-800 via-zinc-950 to-black px-4">
+        <motion.form
+          onSubmit={handleBusinessLookup}
+          initial={{ opacity: 0, y: 24, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          className="w-full max-w-sm rounded-2xl bg-white/95 p-8 shadow-2xl backdrop-blur"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.15, type: 'spring', stiffness: 200 }}
+            className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500 text-white shadow-soft"
+          >
+            <IconStore className="h-6 w-6" />
+          </motion.div>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="mb-3 text-xs font-medium text-slate-400 hover:text-slate-600"
+            >
+              ← Volver
+            </button>
+          )}
+          <h1 className="mb-1 text-center text-xl font-semibold text-slate-800">Mostrador</h1>
+          <p className="mb-6 text-center text-xs text-slate-500">¿Cuál es el nombre de tu negocio?</p>
+
+          <motion.div animate={shakeControls}>
+            <input
+              autoFocus
+              type="text"
+              required
+              value={businessQuery}
+              onChange={(e) => setBusinessQuery(e.target.value)}
+              placeholder="Nombre de tu negocio"
+              className="input"
+            />
+          </motion.div>
+
+          {error && (
+            <motion.p
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="mt-3 text-center text-sm text-rose-600"
+            >
+              {error}
+            </motion.p>
+          )}
+
+          <button type="submit" disabled={lookingUpBusiness} className="btn-primary mt-4 w-full">
+            {lookingUpBusiness ? 'Buscando…' : 'Continuar'}
+          </button>
+        </motion.form>
+      </div>
+    );
+  }
+
   if (mode === 'login' && audience === null) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-800 via-zinc-950 to-black px-4">
@@ -143,16 +223,17 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
           >
             <IconLock className="h-6 w-6" />
           </motion.div>
-          {onBack && (
-            <button
-              type="button"
-              onClick={onBack}
-              className="mb-3 text-xs font-medium text-slate-400 hover:text-slate-600"
-            >
-              ← Volver
-            </button>
-          )}
-          <h1 className="mb-1 text-center text-xl font-semibold text-slate-800">Mostrador</h1>
+          <button
+            type="button"
+            onClick={() => {
+              setResolvedBusiness(null);
+              setError('');
+            }}
+            className="mb-3 text-xs font-medium text-slate-400 hover:text-slate-600"
+          >
+            ← Volver
+          </button>
+          <h1 className="mb-1 text-center text-xl font-semibold text-slate-800">{resolvedBusiness?.name}</h1>
           <p className="mb-6 text-center text-xs text-slate-500">¿Quién va a entrar?</p>
 
           <div className="space-y-3">
@@ -230,7 +311,7 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
           >
             ← Volver
           </button>
-          <h1 className="mb-1 text-center text-xl font-semibold text-slate-800">Empleado</h1>
+          <h1 className="mb-1 text-center text-xl font-semibold text-slate-800">{resolvedBusiness?.name}</h1>
           <p className="mb-6 text-center text-xs text-slate-500">
             {employeeStep === 'manual' ? 'Ingresa tu usuario y contraseña' : 'Escanea tu código o entra manualmente'}
           </p>
@@ -263,14 +344,6 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
                   type="text"
                   required
                   autoFocus
-                  value={storeCode}
-                  onChange={(e) => setStoreCode(e.target.value)}
-                  placeholder="Código de tienda"
-                  className="input"
-                />
-                <input
-                  type="text"
-                  required
                   value={employeeUsername}
                   onChange={(e) => setEmployeeUsername(e.target.value)}
                   placeholder="Usuario"
@@ -286,9 +359,6 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
                   className="input"
                 />
               </motion.div>
-              <p className="mt-2 text-center text-xs text-slate-400">
-                El código de tienda te lo da el dueño (lo ve en Ajustes → Empleados).
-              </p>
               {error && (
                 <motion.p
                   initial={{ opacity: 0, x: -6 }}
@@ -420,7 +490,9 @@ export default function LoginGate({ initialMode = 'login', onBack }) {
         >
           ← Volver
         </button>
-        <h1 className="mb-1 text-center text-xl font-semibold text-slate-800">Mostrador</h1>
+        <h1 className="mb-1 text-center text-xl font-semibold text-slate-800">
+          {mode === 'login' ? resolvedBusiness?.name : 'Mostrador'}
+        </h1>
         <p className="mb-6 text-center text-xs text-slate-500">
           {mode === 'login' ? 'Ingresa a tu panel' : 'Crea la cuenta de tu negocio'}
         </p>

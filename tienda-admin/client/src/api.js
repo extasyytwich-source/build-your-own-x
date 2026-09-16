@@ -44,6 +44,7 @@ async function request(path, { method = 'GET', body } = {}) {
 }
 
 export const api = {
+  lookupBusiness: (query) => request(`/auth/business-lookup?q=${encodeURIComponent(query)}`),
   signup: (businessName, email, password) =>
     request('/auth/signup', { method: 'POST', body: { businessName, email, password } }),
   login: (identifier, password) => request('/auth/login', { method: 'POST', body: { identifier, password } }),

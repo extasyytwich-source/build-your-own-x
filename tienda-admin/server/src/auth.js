@@ -202,6 +202,29 @@ export async function createEmployee(businessId, { name, username, password }) {
   }
 }
 
+// Primer paso del login: identificar la tienda por su nombre (o por su
+// código, para cuando dos negocios sin relación eligieron el mismo nombre).
+// El código de tienda que resuelve esto no es información sensible —igual
+// que el nombre de la tienda, es algo que el dueño comparte a propósito con
+// sus empleados—, así que devolverlo acá no expone nada que no debiera.
+export async function lookupBusiness(query) {
+  const raw = String(query).trim();
+  if (!raw) return { match: null };
+
+  const byCode = await pool.query('SELECT id, name, store_code FROM businesses WHERE store_code = $1', [
+    raw.toUpperCase(),
+  ]);
+  if (byCode.rows[0]) return { match: byCode.rows[0] };
+
+  const byName = await pool.query(
+    'SELECT id, name, store_code FROM businesses WHERE lower(trim(name)) = lower($1)',
+    [raw]
+  );
+  if (byName.rows.length === 1) return { match: byName.rows[0] };
+  if (byName.rows.length > 1) return { match: null, ambiguous: true };
+  return { match: null };
+}
+
 // Código QR de acceso rápido de un empleado (ver routes/employees.js): un
 // token de alta entropía que hace de "credencial física" — quien lo tenga
 // entra directo como ese empleado, sin usuario ni contraseña. Se guarda solo
