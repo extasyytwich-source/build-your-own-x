@@ -14,7 +14,7 @@ function formatClp(n) {
 // Aparte de la respuesta al que cobró (que no necesita ver el costo/margen,
 // menos todavía un cajero): un aviso al dueño con qué se vendió y cuánto
 // ganó. No hace nada si el negocio no vinculó un chat de Telegram.
-async function notifySaleByTelegram(businessId, lines, total, profit) {
+async function notifySaleByTelegram(businessId, lines, total, profit, discount = 0) {
   const { rows } = await pool.query('SELECT telegram_chat_id FROM businesses WHERE id = $1', [
     businessId,
   ]);
@@ -24,31 +24,66 @@ async function notifySaleByTelegram(businessId, lines, total, profit) {
   const itemLines = lines
     .map((l) => `• ${l.quantity}x ${l.productName} — ${formatClp(l.unitPrice * l.quantity)}`)
     .join('\n');
-  const text = `🛒 Nueva venta\n\n${itemLines}\n\nTotal: ${formatClp(total)}\nGanancia: ${formatClp(profit)}`;
+  const discountLine = discount > 0 ? `\nDescuento: -${formatClp(discount)}` : '';
+  const text = `🛒 Nueva venta\n\n${itemLines}${discountLine}\n\nTotal: ${formatClp(total)}\nGanancia: ${formatClp(profit)}`;
   await sendTelegramMessage(chatId, text);
+}
+
+const DISCOUNT_TYPES = ['percent', 'fixed'];
+
+function isValidDiscount(discount) {
+  if (discount === undefined || discount === null) return true;
+  return (
+    typeof discount === 'object' &&
+    DISCOUNT_TYPES.includes(discount.type) &&
+    Number.isFinite(Number(discount.value)) &&
+    Number(discount.value) >= 0
+  );
+}
+
+// Convierte un descuento (% o monto fijo) en un monto en pesos, sin dejar
+// que se pase del total que está descontando ni que quede negativo.
+function resolveDiscountAmount(baseAmount, discount) {
+  if (!discount || !Number(discount.value)) return 0;
+  const value = Number(discount.value);
+  const amount = discount.type === 'percent' ? baseAmount * (value / 100) : value;
+  return Math.min(Math.max(amount, 0), baseAmount);
 }
 
 // Cobra varios productos de una vez (el carrito de Caja): cada línea se
 // registra como la misma "salida" de siempre (mismo stock, mismo
-// unit_price/unit_cost congelados), agrupadas bajo un ticket (`sales`) para
-// poder emitir un solo recibo. Transaccional: si falta stock de cualquier
-// línea, no se descuenta nada.
+// unit_cost congelado), agrupadas bajo un ticket (`sales`) para poder
+// emitir un solo recibo. Transaccional: si falta stock de cualquier línea,
+// no se descuenta nada.
+//
+// Descuentos: cada línea puede traer su propio descuento (% o monto fijo),
+// y además puede haber un descuento sobre el total del carrito. El de línea
+// se aplica primero; el del total se reparte proporcionalmente entre las
+// líneas ya descontadas, así el unit_price que queda congelado en cada
+// movimiento es el precio neto realmente cobrado — sin eso, los reportes de
+// IVA/ganancia (que leen unit_price de movements) no necesitan tocarse.
 salesRouter.post('/', async (req, res) => {
-  const { items, paymentMethod, amountReceived } = req.body ?? {};
+  const { items, paymentMethod, amountReceived, discount } = req.body ?? {};
 
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'El carrito está vacío' });
   }
   const method = paymentMethod === 'tarjeta' ? 'tarjeta' : 'efectivo';
+  if (!isValidDiscount(discount)) {
+    return res.status(400).json({ error: 'Descuento inválido' });
+  }
   for (const item of items) {
     const qty = Number(item?.quantity);
     if (!item?.productId || !Number.isFinite(qty) || qty <= 0) {
       return res.status(400).json({ error: 'Cada línea del carrito necesita un producto y una cantidad válida' });
     }
+    if (!isValidDiscount(item.discount)) {
+      return res.status(400).json({ error: 'Descuento inválido' });
+    }
   }
 
   const client = await pool.connect();
-  let saleId, total, totalCost, lines;
+  let saleId, total, totalCost, totalDiscount, lines;
   try {
     await client.query('BEGIN');
     const { rows: saleRows } = await client.query(
@@ -58,10 +93,32 @@ salesRouter.post('/', async (req, res) => {
     );
     saleId = saleRows[0].id;
 
+    const { rows: productRows } = await client.query(
+      'SELECT id, price FROM products WHERE business_id = $1 AND id = ANY($2)',
+      [req.businessId, items.map((i) => i.productId)]
+    );
+    const priceById = new Map(productRows.map((p) => [p.id, Number(p.price)]));
+
+    // 1) descuento de línea: precio neto por unidad de cada producto.
+    const lineUnitPrices = items.map((item) => {
+      const qty = Number(item.quantity);
+      const basePrice = priceById.get(item.productId) ?? 0;
+      const lineDiscount = resolveDiscountAmount(basePrice * qty, item.discount);
+      return (basePrice * qty - lineDiscount) / qty;
+    });
+    const subtotal = items.reduce((sum, item, i) => sum + lineUnitPrices[i] * Number(item.quantity), 0);
+
+    // 2) descuento del total: se reparte proporcionalmente para que el
+    // precio neto de cada producto (y su impuesto) quede correcto.
+    totalDiscount = resolveDiscountAmount(subtotal, discount);
+    const shareLeft = subtotal > 0 ? 1 - totalDiscount / subtotal : 1;
+
     total = 0;
     totalCost = 0;
     lines = [];
-    for (const item of items) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const finalUnitPrice = lineUnitPrices[i] * shareLeft;
       const movement = await registerMovement(
         client,
         req.businessId,
@@ -69,7 +126,7 @@ salesRouter.post('/', async (req, res) => {
         'salida',
         Number(item.quantity),
         null,
-        saleId
+        { saleId, unitPriceOverride: finalUnitPrice }
       );
       total += Number(movement.unit_price) * Number(movement.quantity);
       totalCost += Number(movement.unit_cost) * Number(movement.quantity);
@@ -82,7 +139,11 @@ salesRouter.post('/', async (req, res) => {
       throw err;
     }
 
-    await client.query('UPDATE sales SET total = $1 WHERE id = $2', [total, saleId]);
+    await client.query('UPDATE sales SET total = $1, discount_amount = $2 WHERE id = $3', [
+      total,
+      totalDiscount,
+      saleId,
+    ]);
     await client.query('COMMIT');
 
     broadcast('sale', { total, items: lines.length }, req.headers['x-client-id'], req.businessId);
@@ -92,6 +153,7 @@ salesRouter.post('/', async (req, res) => {
     res.status(201).json({
       saleId,
       total,
+      discount: totalDiscount,
       change: method === 'efectivo' ? Number(amountReceived) - total : null,
       items: lines,
     });
@@ -103,7 +165,7 @@ salesRouter.post('/', async (req, res) => {
     client.release();
   }
 
-  notifySaleByTelegram(req.businessId, lines, total, total - totalCost).catch((err) => {
+  notifySaleByTelegram(req.businessId, lines, total, total - totalCost, totalDiscount).catch((err) => {
     console.error('Error avisando la venta por Telegram:', err.message);
   });
 });
@@ -146,12 +208,21 @@ salesRouter.get('/:id/receipt.pdf', async (req, res) => {
   doc.moveDown();
 
   doc.fontSize(10).fillColor('#444');
+  let itemsTotal = 0;
   for (const item of items) {
-    const subtotal = item.quantity * item.unit_price;
+    const lineTotal = item.quantity * item.unit_price;
+    itemsTotal += lineTotal;
     doc.text(`${item.product_name}  x${item.quantity}`, { continued: true });
-    doc.text(formatClp(subtotal), { align: 'right' });
+    doc.text(formatClp(lineTotal), { align: 'right' });
   }
   doc.moveDown();
+
+  if (Number(sale.discount_amount) > 0) {
+    doc.fontSize(10).fillColor('#666');
+    doc.text(`Subtotal: ${formatClp(itemsTotal + Number(sale.discount_amount))}`, { align: 'right' });
+    doc.text(`Descuento: -${formatClp(sale.discount_amount)}`, { align: 'right' });
+    doc.moveDown(0.3);
+  }
 
   doc.fillColor('#000').fontSize(13).text(`Total: ${formatClp(sale.total)}`, { align: 'right' });
 
