@@ -56,14 +56,19 @@ export default function StickyNav({ onGetStarted, onLogin }) {
           </motion.button>
         </div>
 
-        <button
-          onClick={() => setMobileOpen((v) => !v)}
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-white/80 sm:hidden"
-          aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
-          aria-expanded={mobileOpen}
-        >
-          {mobileOpen ? <IconX className="h-5 w-5" /> : <IconMenu className="h-5 w-5" />}
-        </button>
+        <div className="flex items-center gap-1 sm:hidden">
+          <button onClick={onLogin} className="px-2 py-2 text-sm font-medium text-white/70">
+            Entrar
+          </button>
+          <button
+            onClick={() => setMobileOpen((v) => !v)}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-white/80"
+            aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
+            aria-expanded={mobileOpen}
+          >
+            {mobileOpen ? <IconX className="h-5 w-5" /> : <IconMenu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       <AnimatePresence>
@@ -86,15 +91,6 @@ export default function StickyNav({ onGetStarted, onLogin }) {
                   {link.label}
                 </a>
               ))}
-              <button
-                onClick={() => {
-                  setMobileOpen(false);
-                  onLogin();
-                }}
-                className="rounded-lg px-2 py-2.5 text-left text-sm font-medium text-white/70 hover:bg-night-card hover:text-white"
-              >
-                Iniciar sesión
-              </button>
               <button
                 onClick={() => {
                   setMobileOpen(false);
