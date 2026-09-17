@@ -34,6 +34,62 @@ breve y directo de máximo 200 palabras que cubra en este orden:
 Tono profesional pero cercano, como si le hablaras directamente al dueño de la
 tienda. No inventes datos que no estén en el JSON.`;
 
+const WEEKLY_SYSTEM_PROMPT = `Eres un asistente de compras para el dueño de una tienda pequeña.
+Recibes una lista en JSON de productos con su stock actual, cuántos días de
+cobertura les quedan según su venta reciente, cuánto conviene comprar para
+volver a un mes de stock, y para cuándo conviene tener el pedido hecho.
+
+Responde en español, en texto plano (sin markdown ni títulos), en máximo 120
+palabras: menciona primero los 2-3 productos más urgentes (los que se
+agotan antes), cuánto comprar de cada uno y para cuándo, y cierra con una
+frase breve de contexto general si hay más productos en la lista. Tono
+directo y práctico, como si le hablaras al dueño de la tienda. No inventes
+datos que no estén en el JSON.`;
+
+export async function generateWeeklyPurchaseDigest(businessId, items) {
+  const anthropic = await getClient(businessId);
+  if (!anthropic) {
+    const err = new Error('No hay API key de Anthropic configurada');
+    err.status = 400;
+    throw err;
+  }
+
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-opus-5',
+      max_tokens: 512,
+      output_config: { effort: 'low' },
+      system: WEEKLY_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: `Productos a reponer esta semana:\n${JSON.stringify(items, null, 2)}`,
+        },
+      ],
+    });
+
+    const textBlock = response.content.find((block) => block.type === 'text');
+    return textBlock?.text?.trim() || '';
+  } catch (err) {
+    if (err instanceof Anthropic.AuthenticationError) {
+      const e = new Error('La ANTHROPIC_API_KEY configurada no es válida');
+      e.status = 401;
+      throw e;
+    }
+    if (err instanceof Anthropic.RateLimitError) {
+      const e = new Error('Se alcanzó el límite de uso de la API de IA, intenta más tarde');
+      e.status = 429;
+      throw e;
+    }
+    if (err instanceof Anthropic.APIError) {
+      const e = new Error(`Error de la API de IA: ${err.message}`);
+      e.status = 502;
+      throw e;
+    }
+    throw err;
+  }
+}
+
 export async function generateMonthlyAnalysis(businessId, stats, month) {
   const anthropic = await getClient(businessId);
   if (!anthropic) {
