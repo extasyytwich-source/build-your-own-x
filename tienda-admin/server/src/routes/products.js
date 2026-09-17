@@ -58,7 +58,9 @@ function serializeProduct(row, variantRows = null) {
 
 // Filas realmente vendibles/con stock propio: productos independientes y
 // cada variante — nunca la fila "padre" que solo agrupa variantes.
-const SELLABLE_CLAUSE =
+// Exportado porque insights.js necesita el mismo filtro para no proyectar
+// stock/ventas sobre una fila que nunca tiene movimientos propios.
+export const SELLABLE_CLAUSE =
   'NOT EXISTS (SELECT 1 FROM products children WHERE children.parent_product_id = products.id)';
 
 async function fetchVariants(productIds) {

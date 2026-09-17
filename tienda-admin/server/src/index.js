@@ -27,8 +27,10 @@ import { purchaseOrdersRouter } from './routes/purchaseOrders.js';
 import { telegramRouter } from './routes/telegram.js';
 import { telegramWebhookRouter } from './routes/telegramWebhook.js';
 import { eventsRouter } from './routes/events.js';
+import { insightsRouter } from './routes/insights.js';
 import { requireActiveSubscription } from './billing.js';
 import { registerWebhook } from './telegram.js';
+import { startInsightScheduler } from './scheduler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Cuando el cliente ya está compilado (npm run build, o el modo producción
@@ -124,6 +126,7 @@ export function createApp() {
   // de dueño con el mismo prefijo, para que no le apliquen requireAuth.
   app.use('/api/telegram/webhook', telegramWebhookRouter);
   app.use('/api/telegram', requireAuth, requireActiveSubscription, requireOwner, telegramRouter);
+  app.use('/api/insights', requireAuth, requireActiveSubscription, requireOwner, insightsRouter);
 
   if (hasClientBuild) {
     app.use(express.static(clientDist));
@@ -147,6 +150,7 @@ export async function startServer(options = {}) {
   // Sin efecto si no hay TELEGRAM_BOT_TOKEN o PUBLIC_URL (típico en
   // desarrollo local, donde Telegram no puede llamar a localhost).
   registerWebhook(process.env.PUBLIC_URL);
+  startInsightScheduler();
   const requestedPort = options.port ?? (process.env.PORT ? Number(process.env.PORT) : 4000);
 
   return new Promise((resolve, reject) => {

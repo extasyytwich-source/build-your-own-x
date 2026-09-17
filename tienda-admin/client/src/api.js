@@ -97,6 +97,9 @@ export const api = {
   generateMonthlyAnalysis: (month) =>
     request('/reports/monthly/analysis', { method: 'POST', body: { month } }),
 
+  getLatestInsights: () => request('/insights/latest'),
+  generateWeeklyInsights: () => request('/insights/weekly/generate', { method: 'POST' }),
+
   getCashEntries: (month) => request(`/cash?month=${month}`),
   createCashEntry: (data) => request('/cash', { method: 'POST', body: data }),
   deleteCashEntry: (id) => request(`/cash/${id}`, { method: 'DELETE' }),
