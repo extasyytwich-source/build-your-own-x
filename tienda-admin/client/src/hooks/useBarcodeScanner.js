@@ -4,7 +4,15 @@ import { useEffect, useRef } from 'react';
 // carácter del código en unos pocos milisegundos y termina con Enter. Esa
 // velocidad es lo que lo distingue de alguien tecleando a mano, así no
 // interfiere con el tipeo normal en inputs de la página.
-const MAX_INTERVAL_MS = 50;
+//
+// 50ms era demasiado ajustado: algunos lectores (sobre todo por Bluetooth,
+// o si el navegador está ocupado renderizando algo) meten más de 50ms entre
+// una tecla y la siguiente, así que el buffer se reiniciaba a mitad del
+// código y nunca llegaba a completarse (confirmado con un lector real que
+// promedia ~60ms/tecla: el código jamás se armaba entero). 150ms sigue
+// siendo mucho más rápido que cualquier persona tecleando a mano un código
+// largo sin querer, pero le da margen a lectores más lentos.
+const MAX_INTERVAL_MS = 150;
 const MIN_CODE_LENGTH = 3;
 
 function isEditableTarget(target) {
