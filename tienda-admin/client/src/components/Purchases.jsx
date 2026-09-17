@@ -85,6 +85,10 @@ export default function Purchases() {
     loadAll();
   }
 
+  function handleProductCreated(product) {
+    setProducts((prev) => [...prev, product]);
+  }
+
   async function handleReceive() {
     try {
       await api.receivePurchaseOrder(receiveTarget.id);
@@ -368,6 +372,7 @@ export default function Purchases() {
         suppliers={suppliers}
         products={products}
         locations={locations}
+        onProductCreated={handleProductCreated}
       />
 
       <ConfirmDialog
